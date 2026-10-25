@@ -1,0 +1,787 @@
+<title>DiskLens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a dark product stage, one idea per band in a 1080px column; the hero is a live DiskLens window you can zoom into. */
+:root {
+  --ink: #05070b;
+  --stage: #0a0e15;
+  --raise: #111723;
+  --line: rgba(148, 170, 214, 0.14);
+  --fg: #f2f4f8;
+  --muted: #8f99ab;
+  --dim: #5f687a;
+  --accent: #0a84ff;
+  --sky: #4fb3ff;
+  --mint: #7ee0a8;
+  --sun: #ffcf5c;
+  --coral: #ff8a7a;
+  --violet: #a78bfa;
+  --teal: #6ad1e3;
+  --slate: #8e9bb0;
+  --on-tile: #0b0f16;
+  --display: "Sora", -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--ink); scroll-behavior: smooth; }
+body { background: var(--ink); color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.6; overflow-x: clip; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ink); }
+a { color: var(--sky); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--sky); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+p { margin: 0; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.band { padding-block: clamp(72px, 11vw, 140px); position: relative; }
+.band + .band { border-top: 1px solid var(--line); }
+.eyebrow { font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--sky); }
+.h2 { font-size: clamp(32px, 5.2vw, 60px); line-height: 1.12; letter-spacing: -0.015em; font-weight: 700; }
+.lede { color: var(--muted); font-size: clamp(17px, 1.9vw, 21px); max-width: 38em; }
+.lede strong { color: var(--fg); font-weight: 600; }
+.head { display: grid; gap: 16px; margin-bottom: clamp(36px, 6vw, 64px); }
+.grad { background: linear-gradient(92deg, var(--sky), var(--mint) 42%, var(--sun) 72%, var(--coral)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* nav */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(5, 7, 11, 0.72); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 52px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--fg); }
+.brand:hover { text-decoration: none; }
+.mark { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(145deg, #2f8dff, #0a5fd6); display: grid; grid-template: 1fr 1fr / 1.4fr 1fr; gap: 2px; padding: 4px; }
+.mark i { border-radius: 2px; display: block; }
+.mark i:nth-child(1) { background: var(--sky); grid-row: span 2; }
+.mark i:nth-child(2) { background: var(--mint); }
+.mark i:nth-child(3) { background: var(--sun); }
+.nav nav { display: flex; gap: 24px; margin-left: auto; font-size: 13px; }
+.nav nav a { color: var(--muted); }
+.nav nav a:hover { color: var(--fg); text-decoration: none; }
+.pill { font-size: 12px; font-weight: 600; color: var(--fg); background: var(--accent); padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
+@media (max-width: 720px) { .nav nav { display: none; } .pill { margin-left: auto; } }
+
+/* hero */
+.hero { padding-block: clamp(56px, 9vw, 104px) clamp(64px, 9vw, 112px); overflow: hidden; }
+.hero::before { content: ""; position: absolute; left: 50%; top: 38%; width: min(1200px, 160vw); height: 760px; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(10, 132, 255, 0.28), rgba(10, 132, 255, 0.08) 55%, transparent), radial-gradient(closest-side at 70% 60%, rgba(126, 224, 168, 0.12), transparent 70%); pointer-events: none; }
+.hero .wrap { position: relative; display: grid; gap: 22px; justify-items: center; text-align: center; }
+.hero h1 { font-size: clamp(44px, 8.4vw, 104px); line-height: 1.04; letter-spacing: -0.025em; font-weight: 800; }
+.hero .lede { margin-inline: auto; }
+.hero-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; color: var(--dim); font-size: 13px; }
+.hero-meta span::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--mint); margin-right: 8px; vertical-align: 2px; }
+
+/* the app window */
+.window { width: 100%; margin-top: clamp(28px, 5vw, 52px); border-radius: 14px; background: var(--stage); border: 1px solid rgba(148, 170, 214, 0.2); box-shadow: 0 50px 120px -30px rgba(10, 132, 255, 0.35), 0 30px 60px -20px rgba(0, 0, 0, 0.8); text-align: left; overflow: hidden; }
+.titlebar { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: linear-gradient(var(--raise), var(--stage)); font-size: 12px; color: var(--muted); }
+.lights { display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; }
+.lights i:nth-child(3) { background: #28c840; }
+.crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.crumbs button { all: unset; cursor: pointer; color: var(--muted); padding: 2px 6px; border-radius: 5px; }
+.crumbs button:hover { background: rgba(255, 255, 255, 0.07); color: var(--fg); }
+.crumbs button:focus-visible { outline: 2px solid var(--sky); }
+.crumbs b { color: var(--fg); font-weight: 600; padding: 2px 6px; }
+.crumbs .sep { color: var(--dim); }
+.scanstat { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.scanstat .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sun); box-shadow: 0 0 10px var(--sun); }
+.scanstat.done .dot { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+.appbody { display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+.side { border-right: 1px solid var(--line); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.side-h { font-size: 11px; color: var(--dim); letter-spacing: 0.06em; padding: 6px 10px; }
+.row { all: unset; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-rows: auto 3px; column-gap: 10px; row-gap: 5px; align-items: center; padding: 7px 10px; border-radius: 7px; cursor: default; }
+.row.can { cursor: pointer; }
+.row:hover, .row.hot { background: rgba(255, 255, 255, 0.06); }
+.row:focus-visible { outline: 2px solid var(--sky); }
+.row .sw { width: 10px; height: 10px; border-radius: 3px; }
+.row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.row .sz { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row .bar { grid-column: 2 / 4; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.row .bar i { display: block; height: 100%; border-radius: 2px; }
+.stagebox { position: relative; height: clamp(340px, 46vw, 500px); }
+.stagebox canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tip { position: absolute; pointer-events: none; background: rgba(12, 16, 24, 0.92); border: 1px solid rgba(148, 170, 214, 0.25); backdrop-filter: blur(10px); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.45; max-width: 260px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+.tip b { display: block; font-size: 13.5px; }
+.tip .mono { color: var(--muted); font-size: 11.5px; word-break: break-all; }
+.tip em { font-style: normal; color: var(--sky); }
+.hint { position: absolute; right: 12px; bottom: 12px; font-size: 11.5px; color: var(--on-tile); background: rgba(242, 244, 248, 0.86); padding: 4px 10px; border-radius: 999px; pointer-events: none; transition: opacity 0.4s; }
+@media (max-width: 760px) {
+  .appbody { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; }
+  .scanstat .long { display: none; }
+}
+
+/* speed */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px 28px; }
+.stat { display: grid; gap: 8px; align-content: start; }
+.stat .num { font-family: var(--display); font-weight: 700; font-size: clamp(44px, 6vw, 72px); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat .num small { font-size: 0.42em; letter-spacing: 0; margin-left: 4px; color: var(--fg); font-weight: 600; }
+.stat p { color: var(--muted); font-size: 15px; }
+.stat:nth-child(1) .num { color: var(--sky); }
+.stat:nth-child(2) .num { color: var(--mint); }
+.stat:nth-child(3) .num { color: var(--sun); }
+.stat:nth-child(4) .num { color: var(--coral); }
+.how { margin-top: clamp(48px, 7vw, 80px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; border-top: 1px solid var(--line); padding-top: 32px; }
+.how div { display: grid; gap: 6px; }
+.how h3 { font-size: 16px; font-weight: 600; font-family: var(--body); }
+.how p { color: var(--muted); font-size: 14.5px; }
+.how code { font-family: var(--mono); font-size: 12.5px; color: var(--fg); background: rgba(255, 255, 255, 0.06); padding: 1px 6px; border-radius: 5px; }
+@media (max-width: 860px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .how { grid-template-columns: minmax(0, 1fr); } }
+
+/* split sections */
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(32px, 6vw, 72px); align-items: center; }
+.split .head { margin-bottom: 0; }
+.points { display: grid; gap: 18px; margin-top: 28px; }
+.points div { display: grid; gap: 2px; padding-left: 16px; border-left: 2px solid var(--line); }
+.points b { font-weight: 600; }
+.points span { color: var(--muted); font-size: 15px; }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+/* panel mock */
+.panel { background: var(--stage); border: 1px solid rgba(148, 170, 214, 0.2); border-radius: 14px; overflow: hidden; box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.9); min-width: 0; }
+.panel-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel-h b { font-size: 15px; }
+.panel-h span { color: var(--muted); font-size: 13px; }
+.sugg { display: grid; }
+.sugg label { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 4px 12px; padding: 13px 18px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: start; }
+.sugg label:hover { background: rgba(255, 255, 255, 0.03); }
+.sugg input { margin: 3px 0 0; accent-color: var(--accent); width: 16px; height: 16px; }
+.sugg .t { font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sugg .why { grid-column: 2 / 4; color: var(--muted); font-size: 13px; }
+.sugg .sz { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 5px; font-family: var(--body); }
+.tag.safe { color: var(--mint); background: rgba(126, 224, 168, 0.12); }
+.tag.ask { color: var(--sun); background: rgba(255, 207, 92, 0.12); }
+.tag.idle { color: var(--sky); background: rgba(79, 179, 255, 0.12); }
+.panel-f { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: var(--raise); flex-wrap: wrap; }
+.panel-f .total { font-size: 13px; color: var(--muted); }
+.panel-f .total b { font-family: var(--mono); color: var(--fg); font-size: 18px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.btn { font: 600 13px var(--body); color: var(--fg); background: var(--accent); border: 0; border-radius: 8px; padding: 7px 14px; }
+
+/* timeline */
+.chartbox { background: var(--stage); border: 1px solid var(--line); border-radius: 16px; padding: clamp(16px, 3vw, 28px); position: relative; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.chart-scroll { overflow-x: auto; }
+#chart { display: block; width: 100%; min-width: 560px; height: auto; }
+#chart text { font-family: var(--mono); font-size: 11px; fill: var(--dim); }
+#chart .note { font-family: var(--body); font-size: 12px; fill: var(--fg); font-weight: 600; }
+#chart .bar-g { cursor: default; }
+#chart .bar-g:hover rect.hit { fill: rgba(255, 255, 255, 0.05); }
+.ctip { position: absolute; pointer-events: none; background: rgba(12, 16, 24, 0.94); border: 1px solid rgba(148, 170, 214, 0.25); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; min-width: 160px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); }
+.ctip div { display: flex; justify-content: space-between; gap: 16px; }
+.ctip .mono { font-size: 11.5px; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 36px; }
+.facts div { display: grid; gap: 4px; }
+.facts b { font-family: var(--display); font-size: 22px; }
+.facts span { color: var(--muted); font-size: 14.5px; }
+@media (max-width: 760px) { .facts { grid-template-columns: minmax(0, 1fr); } }
+
+/* uninstaller */
+.sheet { padding: 20px; display: grid; gap: 16px; }
+.sheet-top { display: flex; gap: 14px; align-items: center; }
+.appicon { width: 54px; height: 54px; flex: none; border-radius: 13px; background: linear-gradient(150deg, #ffb36b, #ff6f91 55%, #8f6bff); display: grid; place-items: center; font: 800 24px var(--display); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 20px rgba(255, 111, 145, 0.3); }
+.sheet-top b { display: block; font-size: 16px; }
+.sheet-top span { color: var(--muted); font-size: 13.5px; }
+.files { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.file { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 2px 12px; padding: 9px 12px; align-items: center; font-size: 13px; }
+.file + .file { border-top: 1px solid var(--line); }
+.file .ck { width: 14px; height: 14px; border-radius: 4px; background: var(--accent); display: grid; place-items: center; }
+.file .ck::after { content: ""; width: 7px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+.file .ck.off { background: transparent; border: 1.5px solid var(--dim); }
+.file .ck.off::after { display: none; }
+.file .p { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file .k { grid-column: 2; color: var(--muted); font-size: 12px; }
+.file .s { font-family: var(--mono); font-size: 12px; color: var(--muted); grid-row: 1 / 3; grid-column: 3; font-variant-numeric: tabular-nums; }
+.sheet-f { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ghost { font: 500 13px var(--body); color: var(--fg); background: rgba(255, 255, 255, 0.08); border: 0; border-radius: 8px; padding: 7px 14px; }
+
+/* more features */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--stage); border: 1px solid var(--line); border-radius: 18px; padding: 26px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h3 { font-size: 20px; font-weight: 700; }
+.card p { color: var(--muted); font-size: 14.5px; }
+.card .viz { margin-top: 10px; min-height: 64px; display: grid; align-content: end; }
+.big { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: -0.02em; line-height: 1.1; }
+.big small { font-size: 14px; color: var(--muted); font-weight: 500; letter-spacing: 0; margin-left: 6px; font-family: var(--body); }
+.stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.stack i { display: block; }
+.stack-l { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+.stack-l i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.menubar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; color: var(--muted); }
+.menubar b { color: var(--fg); font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.ring { width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(var(--fg) 0 57%, rgba(255, 255, 255, 0.25) 57% 100%); }
+.lines { display: grid; gap: 6px; font-family: var(--mono); font-size: 12px; }
+.lines div { display: flex; justify-content: space-between; gap: 10px; }
+.lines span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.up { color: var(--coral); }
+.down { color: var(--mint); }
+.steps { display: flex; gap: 6px; font-size: 12px; }
+.steps span { flex: 1; text-align: center; padding: 6px 4px; border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+.steps span.on { background: rgba(10, 132, 255, 0.18); color: var(--fg); }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* privacy */
+.privacy { text-align: center; overflow: hidden; }
+.privacy::before { content: ""; position: absolute; left: 50%; top: 50%; width: min(900px, 140vw); height: 520px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(126, 224, 168, 0.13), transparent); pointer-events: none; }
+.privacy .wrap { position: relative; display: grid; gap: 20px; justify-items: center; }
+.privacy .h2 { font-size: clamp(36px, 6.4vw, 76px); }
+.lock { width: 64px; height: 64px; border-radius: 18px; border: 1px solid rgba(126, 224, 168, 0.4); display: grid; place-items: center; background: rgba(126, 224, 168, 0.08); }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 32px; text-align: left; width: 100%; }
+.trio div { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 18px; }
+.trio b { font-size: 16px; }
+.trio span { color: var(--muted); font-size: 14.5px; }
+@media (max-width: 760px) { .trio { grid-template-columns: minmax(0, 1fr); } }
+
+/* cta + footer */
+.cta { text-align: center; }
+.cta .wrap { display: grid; gap: 18px; justify-items: center; }
+.cta .h2 { font-size: clamp(40px, 7vw, 88px); }
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+.cta-row a { font-size: 15px; font-weight: 600; padding: 11px 22px; border-radius: 999px; }
+.cta-row .primary { background: var(--accent); color: var(--fg); }
+.cta-row .secondary { color: var(--sky); border: 1px solid rgba(79, 179, 255, 0.4); }
+.cta-row a:hover { text-decoration: none; filter: brightness(1.12); }
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; color: var(--dim); font-size: 12px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+/* motion: content is visible at rest; only a short lift plays as it enters */
+.lift { transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.lift.pre { transform: translateY(28px); }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .lift, .lift.pre { transition: none; transform: none; }
+}
+</style>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="DiskLens"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>DiskLens</a>
+    <nav aria-label="页面导航">
+      <a href="#speed">速度</a>
+      <a href="#clean">清理</a>
+      <a href="#timeline">时间线</a>
+      <a href="#apps">卸载</a>
+      <a href="#more">更多</a>
+      <a href="#privacy">隐私</a>
+    </nav>
+    <span class="pill">即将推出</span>
+  </div>
+</header>
+
+<main id="top">
+  <section class="band hero">
+    <div class="wrap">
+      <p class="eyebrow">DiskLens · 磁盘空间分析</p>
+      <h1>看清<span class="grad">每一 GB</span><br>的去向。</h1>
+      <p class="lede">原生速度扫完整块磁盘，把空间画成一张可以放大的地图，再告诉你哪些能放心删掉、删了会怎样。</p>
+      <div class="hero-meta"><span>原生 macOS 应用</span><span>数据只留在你的 Mac 上</span><span>macOS 14 及以上</span></div>
+
+      <div class="window" role="group" aria-label="DiskLens 演示窗口">
+        <div class="titlebar">
+          <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="crumbs" id="crumbs"></div>
+          <div class="scanstat" id="scanstat" aria-live="polite"><span class="dot"></span><span id="scantext" class="mono">准备扫描</span></div>
+        </div>
+        <div class="appbody">
+          <div class="side" id="side" aria-label="文件夹列表"></div>
+          <div class="stagebox" id="stagebox">
+            <canvas id="map" aria-label="可放大的空间地图：点一下色块进入文件夹"></canvas>
+            <div class="tip" id="tip" hidden></div>
+            <div class="hint" id="hint">点一下色块，放大进去看</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="speed">
+    <div class="wrap">
+      <div class="head lift">
+        <p class="eyebrow">速度</p>
+        <h2 class="h2">喝一口咖啡的工夫，<br>整个文件夹已经看完。</h2>
+        <p class="lede">DiskLens 一次批量读取整个目录的属性，几十个线程同时向下走。扫描结果会保存下来，下次打开只更新变过的文件夹。</p>
+      </div>
+      <div class="stats lift">
+        <div class="stat"><div class="num"><span data-count="7.5" data-dec="1">7.5</span><small>秒</small></div><p>扫完一个有 160 万个文件的个人文件夹</p></div>
+        <div class="stat"><div class="num"><span data-count="1" data-dec="0">1</span><small>秒</small></div><p>再次打开时，只重扫变化过的文件夹</p></div>
+        <div class="stat"><div class="num"><span data-count="0.01" data-dec="2">0.01</span><small>%</small></div><p>和终端里 <span class="mono">du</span> 的结果相差不到这么多</p></div>
+        <div class="stat"><div class="num">≈<span data-count="1" data-dec="0">1</span><small>% CPU</small></div><p>后台记录写入活动时的占用</p></div>
+      </div>
+      <div class="how lift">
+        <div><h3>批量读取目录</h3><p>用 <code>getattrlistbulk</code> 一次拿到一整个目录的大小和类型，不必逐个文件询问系统。</p></div>
+        <div><h3>算的是真实占用</h3><p>按磁盘上实际分配的空间统计，硬链接只算一次，不会跨到其他磁盘上去。</p></div>
+        <div><h3>只更新变化</h3><p>借助 FSEvents 记下哪些文件夹变过，下次打开时直接从上次的结果接着更新。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="clean">
+    <div class="wrap split">
+      <div class="head lift">
+        <p class="eyebrow">智能清理建议</p>
+        <h2 class="h2">不只告诉你能删什么，<br>还告诉你删了会怎样。</h2>
+        <p class="lede">49 条清理规则覆盖开发工具、浏览器、聊天应用和系统缓存，再加上对久未打开的项目、已卸载应用残留的判断。</p>
+        <div class="points">
+          <div><b>每条建议都写明后果</b><span>比如「下次编译时会自动重新生成」，你可以放心做决定。</span></div>
+          <div><b>分级标出风险</b><span>可以直接删的标为安全，可能还要用的会请你确认。</span></div>
+          <div><b>先放进收集筐</b><span>挑好之后一次移到废纸篓，随时可以从废纸篓放回。</span></div>
+        </div>
+      </div>
+      <div class="panel lift" aria-label="清理建议示例">
+        <div class="panel-h"><b>找到 67.1 GB 可以释放</b><span>示例数据</span></div>
+        <div class="sugg" id="sugg"></div>
+        <div class="panel-f"><span class="total">已选 <b id="picked">46.8 GB</b></span><button class="btn" type="button" tabindex="-1">加入收集筐</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="timeline">
+    <div class="wrap">
+      <div class="head lift">
+        <p class="eyebrow">空间时间线</p>
+        <h2 class="h2">空间突然少了，<br>知道是谁、哪天写的。</h2>
+        <p class="lede">后台的小助手每 10 秒记录一次各个应用写了多少数据，再把增长的文件夹归到对应的应用。时间线按天排开，哪一天出了状况一眼就能看出来。</p>
+      </div>
+      <div class="chartbox lift">
+        <div class="legend" id="legend"></div>
+        <div class="chart-scroll"><svg id="chart" viewBox="0 0 760 300" role="img" aria-label="过去 14 天每天新写入的数据，按应用分开"></svg></div>
+        <div class="ctip" id="ctip" hidden></div>
+      </div>
+      <div class="facts lift">
+        <div><b>按应用归属</b><span>每个进程写了多少字节，直接读系统计数，不用猜。</span></div>
+        <div><b>按文件夹定位</b><span>增长最快的文件夹会列出来，点一下就跳到地图里的位置。</span></div>
+        <div><b>低调运行</b><span>作为登录项在后台工作，CPU 占用约 1%，可以随时在设置里关掉。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="apps">
+    <div class="wrap split">
+      <div class="head lift">
+        <p class="eyebrow">应用卸载</p>
+        <h2 class="h2">把应用拖进废纸篓，<br>剩下的交给它。</h2>
+        <p class="lede">删掉一个应用，它的缓存、设置和数据往往还留在资源库里。DiskLens 会注意到废纸篓里新来的应用，把它留下的东西一起列出来。</p>
+        <div class="points">
+          <div><b>找得准</b><span>按应用的标识符、开发者团队和内置的辅助程序去找，同一家公司的其他应用不会被牵连。</span></div>
+          <div><b>分得清</b><span>确定属于它的默认勾选，只是名字相近的列为「可能」，由你决定。</span></div>
+          <div><b>系统级的也不放过</b><span>需要管理员权限的启动项会单独列出，并附上可以照着执行的命令。</span></div>
+        </div>
+      </div>
+      <div class="panel lift" aria-label="卸载残留示例">
+        <div class="sheet">
+          <div class="sheet-top">
+            <div class="appicon" aria-hidden="true">L</div>
+            <div><b>Lumen Editor 已移到废纸篓</b><span>它还在资源库里留下了 3.5 GB 的数据和设置。</span></div>
+          </div>
+          <div class="files">
+            <div class="file"><span class="ck"></span><span class="p">Containers/com.lumen.Editor</span><span class="k">沙盒数据 · 确定</span><span class="s">2.1 GB</span></div>
+            <div class="file"><span class="ck"></span><span class="p">Application Support/Lumen</span><span class="k">应用数据 · 确定</span><span class="s">860 MB</span></div>
+            <div class="file"><span class="ck"></span><span class="p">Caches/com.lumen.Editor.ShipIt</span><span class="k">更新缓存 · 确定</span><span class="s">412 MB</span></div>
+            <div class="file"><span class="ck off"></span><span class="p">Group Containers/group.lumen.shared</span><span class="k">共享数据 · 可能</span><span class="s">96 MB</span></div>
+            <div class="file"><span class="ck"></span><span class="p">Preferences/com.lumen.Editor.plist</span><span class="k">偏好设置 · 确定</span><span class="s">24 KB</span></div>
+            <div class="file"><span class="ck"></span><span class="p">LaunchAgents/com.lumen.updater.plist</span><span class="k">启动项 · 确定</span><span class="s">2 KB</span></div>
+          </div>
+          <div class="sheet-f"><button class="ghost" type="button" tabindex="-1">保留</button><button class="btn" type="button" tabindex="-1">加入收集筐（3.4 GB）</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="more">
+    <div class="wrap">
+      <div class="head lift">
+        <p class="eyebrow">还有更多</p>
+        <h2 class="h2">每一个角落，都替你看过。</h2>
+      </div>
+      <div class="grid lift">
+        <div class="card">
+          <h3>重复文件</h3>
+          <p>先比大小，再比头尾，最后逐字节核对。APFS 克隆出来的副本不占额外空间，不会被误报。</p>
+          <div class="viz"><div class="big mono">8.2 GB<small>14 组重复</small></div></div>
+        </div>
+        <div class="card">
+          <h3>大文件</h3>
+          <p>按大小和最后打开时间排好，一年没碰过的大家伙一眼可见。</p>
+          <div class="viz lines">
+            <div><span>Final Cut 资源库</span><span>61.3 GB</span></div>
+            <div><span>ubuntu-24.04.iso</span><span>6.1 GB</span></div>
+            <div><span>旅行素材.zip</span><span>4.7 GB</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>变化对比</h3>
+          <p>和上一次扫描相比，哪些文件夹长了、哪些变小了。</p>
+          <div class="viz lines">
+            <div><span>Library/Containers/Docker</span><span class="up">+6.2 GB</span></div>
+            <div><span>Movies/屏幕录制</span><span class="up">+3.1 GB</span></div>
+            <div><span>Downloads</span><span class="down">−2.4 GB</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>存储详情</h3>
+          <p>「系统数据」到底是什么：系统卷、本地快照、可清除空间，分开讲清楚。</p>
+          <div class="viz">
+            <div class="stack" aria-hidden="true"><i style="flex:492;background:var(--sky)"></i><i style="flex:38;background:var(--slate)"></i><i style="flex:21;background:var(--violet)"></i><i style="flex:23;background:var(--teal)"></i><i style="flex:420;background:rgba(255,255,255,.08)"></i></div>
+            <div class="stack-l"><span><i style="background:var(--sky)"></i>你的文件</span><span><i style="background:var(--slate)"></i>系统</span><span><i style="background:var(--violet)"></i>本地快照</span><span><i style="background:var(--teal)"></i>可清除</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>菜单栏</h3>
+          <p>剩余空间常驻菜单栏，快满的时候发一条通知提醒你。</p>
+          <div class="viz"><div class="menubar" aria-hidden="true"><span>Wi‑Fi</span><b><span class="ring"></span>214 GB 可用</b><span class="mono">10:24</span></div></div>
+        </div>
+        <div class="card">
+          <h3>权限引导</h3>
+          <p>需要完全磁盘访问权限时，一步步带你在系统设置里打开，授权后自动接着扫描。</p>
+          <div class="viz"><div class="steps" aria-hidden="true"><span class="on">打开设置</span><span class="on">拖入应用</span><span>完成</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band privacy" id="privacy">
+    <div class="wrap">
+      <div class="lock" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7ee0a8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5" fill="none"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" fill="none"/></svg>
+      </div>
+      <h2 class="h2 lift">你的磁盘，<br>只有你看得到。</h2>
+      <p class="lede">扫描结果、写入记录和清理历史都存在你自己的 Mac 上。DiskLens 不上传文件名，不收集使用数据，也不需要账号。</p>
+      <div class="trio lift">
+        <div><b>不联网</b><span>所有分析都在本机完成。</span></div>
+        <div><b>本地存储</b><span>记录保存在你的资源库里，删掉应用就一起删掉。</span></div>
+        <div><b>删之前先确认</b><span>文件只会移到废纸篓，不会直接抹掉。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band cta">
+    <div class="wrap">
+      <span class="mark" aria-hidden="true" style="width:72px;height:72px;border-radius:20px;padding:10px;gap:5px"><i></i><i></i><i></i></span>
+      <h2 class="h2 lift">DiskLens<br><span class="grad">即将推出。</span></h2>
+      <p class="lede">支持 macOS 14 Sonoma 及以上，Apple 芯片和 Intel 机型都能用。</p>
+      <div class="cta-row">
+        <a class="primary" href="https://github.com/calabli/DiskLens" target="_blank" rel="noopener">在 GitHub 上关注</a>
+        <a class="secondary" href="#top">再看一遍演示</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>DiskLens · 2026</span>
+    <span>页面中的文件夹、应用和数字均为示例数据。</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n) => css.getPropertyValue(n).trim();
+  const KIND = { dev: tok("--sky"), sys: tok("--violet"), media: tok("--coral"), photo: tok("--sun"), doc: tok("--mint"), cache: tok("--teal"), arch: tok("--slate") };
+  const INK = tok("--ink"), ON = tok("--on-tile");
+
+  // ---------- example home folder (GB) ----------
+  const ROOT = { n: "你", p: "~", c: [
+    { n: "资源库", p: "Library", c: [
+      { n: "Developer", c: [{ n: "CoreSimulator", s: 26, k: "dev" }, { n: "iOS DeviceSupport", s: 21.6, k: "dev" }, { n: "DerivedData", s: 18.4, k: "dev" }, { n: "Archives", s: 6, k: "dev" }] },
+      { n: "Containers", c: [{ n: "Docker", s: 31.2, k: "sys" }, { n: "微信", s: 7.4, k: "sys" }, { n: "其他", s: 3.1, k: "sys" }] },
+      { n: "Application Support", c: [{ n: "Steam", s: 18.2, k: "media" }, { n: "Google", s: 9.1, k: "sys" }, { n: "Slack", s: 4.3, k: "sys" }, { n: "其他", s: 5.2, k: "sys" }] },
+      { n: "Caches", c: [{ n: "Google", s: 6.2, k: "cache" }, { n: "Homebrew", s: 4.4, k: "cache" }, { n: "Spotify", s: 3.3, k: "cache" }, { n: "其他", s: 8.1, k: "cache" }] },
+    ] },
+    { n: "影片", p: "Movies", c: [{ n: "Final Cut 资源库", s: 61.3, k: "media" }, { n: "屏幕录制", s: 18.7, k: "media" }, { n: "导出", s: 12.1, k: "media" }] },
+    { n: "图片", p: "Pictures", c: [{ n: "照片图库", s: 71.4, k: "photo" }, { n: "截屏", s: 2.9, k: "photo" }] },
+    { n: "Projects", c: [
+      { n: "ml-experiments", c: [{ n: "checkpoints", s: 19.6, k: "dev" }, { n: "datasets", s: 6.8, k: "dev" }] },
+      { n: "web-app", c: [{ n: "node_modules", s: 14.2, k: "dev" }, { n: ".next", s: 5.8, k: "dev" }, { n: "src", s: 0.9, k: "doc" }] },
+      { n: "ios-client", c: [{ n: "build", s: 6.9, k: "dev" }, { n: "Pods", s: 4.1, k: "dev" }] },
+    ] },
+    { n: "下载", p: "Downloads", c: [{ n: "压缩包", s: 17.2, k: "arch" }, { n: "安装包", s: 12.4, k: "arch" }, { n: "视频", s: 11.6, k: "media" }] },
+    { n: "文稿", p: "Documents", c: [{ n: "工作", s: 14.8, k: "doc" }, { n: "论文资料", s: 9.6, k: "doc" }, { n: "扫描件", s: 8.9, k: "doc" }] },
+    { n: "音乐", p: "Music", c: [{ n: "Logic 工程", s: 13.5, k: "media" }, { n: "音乐资料库", s: 6.7, k: "media" }] },
+  ] };
+
+  // parents, paths, per-leaf scan delay and a little shade variation
+  let leafIndex = 0;
+  (function prep(node, parent) {
+    node.parent = parent;
+    node.path = parent ? parent.path + "/" + (node.p || node.n) : "~";
+    if (node.c) node.c.forEach((ch) => prep(ch, node));
+    else { node.delay = ((leafIndex * 0.37) % 1) * 0.55; node.shade = ((leafIndex * 0.61) % 1) - 0.5; leafIndex++; node.f = 1; }
+  })(ROOT, null);
+
+  const value = (n) => (n.c ? n.c.reduce((a, ch) => a + value(ch), 0) : n.s * n.f);
+  const kindOf = (n) => { if (!n.c) return n.k; let best = n.c[0]; for (const ch of n.c) if (value(ch) > value(best)) best = ch; return kindOf(best); };
+  const fmt = (gb) => (gb >= 1 ? gb.toFixed(1) + " GB" : Math.max(1, Math.round(gb * 1024)) + " MB");
+
+  function mix(hex, amt) {
+    const h = hex.replace("#", ""); const v = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const t = amt > 0 ? 255 : 0, a = Math.abs(amt);
+    return "rgb(" + v.map((c) => Math.round(c + (t - c) * a)).join(",") + ")";
+  }
+
+  // ---------- squarified treemap ----------
+  function squarify(items, x, y, w, h) {
+    const list = items.map((n) => ({ n, v: value(n) })).filter((o) => o.v > 0).sort((a, b) => b.v - a.v);
+    const total = list.reduce((a, o) => a + o.v, 0); const out = [];
+    if (!total || w <= 0 || h <= 0) return out;
+    const k = (w * h) / total; list.forEach((o) => (o.a = o.v * k));
+    let row = [];
+    const worst = (r, side) => { let s = 0, mx = 0, mn = Infinity; for (const o of r) { s += o.a; mx = Math.max(mx, o.a); mn = Math.min(mn, o.a); } return Math.max((side * side * mx) / (s * s), (s * s) / (side * side * mn)); };
+    const place = (r) => {
+      const s = r.reduce((a, o) => a + o.a, 0);
+      if (w >= h) { const cw = s / h; let yy = y; for (const o of r) { const hh = o.a / cw; out.push({ n: o.n, r: { x, y: yy, w: cw, h: hh } }); yy += hh; } x += cw; w -= cw; }
+      else { const rh = s / w; let xx = x; for (const o of r) { const ww = o.a / rh; out.push({ n: o.n, r: { x: xx, y, w: ww, h: rh } }); xx += ww; } y += rh; h -= rh; }
+    };
+    let i = 0;
+    while (i < list.length) {
+      const side = Math.min(w, h), o = list[i];
+      if (!row.length || worst(row.concat(o), side) <= worst(row, side)) { row.push(o); i++; }
+      else { place(row); row = []; }
+    }
+    if (row.length) place(row);
+    return out;
+  }
+
+  function layoutOf(node, F) {
+    return { node, tiles: squarify(node.c, F.x, F.y, F.w, F.h).map((t) => ({ ...t, subs: t.n.c ? squarify(t.n.c, t.r.x + 1, t.r.y + 1, t.r.w - 2, t.r.h - 2) : [] })) };
+  }
+
+  // ---------- canvas ----------
+  const canvas = document.getElementById("map"), ctx = canvas.getContext("2d");
+  const box = document.getElementById("stagebox"), tip = document.getElementById("tip"), hint = document.getElementById("hint");
+  let W = 0, H = 0, dpr = 1, F = { x: 0, y: 0, w: 1, h: 1 };
+  let focus = ROOT, layer = null, trans = null, hover = null, scanning = !reduce, scanStart = 0;
+
+  function resize() {
+    const r = box.getBoundingClientRect(); dpr = Math.min(2, devicePixelRatio || 1);
+    W = r.width; H = r.height; F = { x: 0, y: 0, w: W, h: H };
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    layer = layoutOf(focus, F); draw();
+  }
+
+  const mapR = (r, s, d) => { const sx = d.w / s.w, sy = d.h / s.h; return { x: d.x + (r.x - s.x) * sx, y: d.y + (r.y - s.y) * sy, w: r.w * sx, h: r.h * sy }; };
+  const lerpR = (a, b, e) => ({ x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, w: a.w + (b.w - a.w) * e, h: a.h + (b.h - a.h) * e });
+
+  function fillTile(R, color, shade) {
+    if (R.w < 0.6 || R.h < 0.6) return;
+    const g = ctx.createLinearGradient(R.x, R.y, R.x + R.w * 0.4, R.y + R.h);
+    g.addColorStop(0, mix(color, 0.16 + shade * 0.12)); g.addColorStop(1, mix(color, -0.14 + shade * 0.12));
+    ctx.fillStyle = g;
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(R.x, R.y, R.w, R.h, Math.min(4, R.w / 3, R.h / 3)); else ctx.rect(R.x, R.y, R.w, R.h); ctx.fill();
+  }
+
+  function drawLayer(L, src, dst, alpha, labels) {
+    ctx.save(); ctx.globalAlpha = alpha;
+    for (const t of L.tiles) {
+      const R = mapR(t.r, src, dst);
+      if (R.x > W || R.y > H || R.x + R.w < 0 || R.y + R.h < 0) continue;
+      const inner = { x: R.x + 1, y: R.y + 1, w: R.w - 2, h: R.h - 2 };
+      if (t.subs.length) for (const s of t.subs) { const S = mapR(s.r, src, dst); fillTile({ x: S.x + 0.5, y: S.y + 0.5, w: S.w - 1, h: S.h - 1 }, KIND[kindOf(s.n)], s.n.shade || 0); }
+      else fillTile(inner, KIND[kindOf(t.n)], t.n.shade || 0);
+      if (labels && R.w > 66 && R.h > 34) {
+        ctx.save(); ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
+        ctx.fillStyle = ON; ctx.font = "600 13px " + tok("--body"); ctx.textBaseline = "top";
+        ctx.fillText(t.n.n, R.x + 9, R.y + 8);
+        ctx.globalAlpha = alpha * 0.66; ctx.font = "500 11px " + tok("--mono"); ctx.fillText(fmt(value(t.n)), R.x + 9, R.y + 26);
+        ctx.restore();
+      }
+      if (hover && hover.t === t && !trans) { ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 2; ctx.strokeRect(R.x + 1, R.y + 1, R.w - 2, R.h - 2); }
+    }
+    ctx.restore();
+  }
+
+  function draw(now) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+    if (trans) {
+      const t = Math.min(1, (now - trans.start) / trans.dur), k = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const e = trans.from + (trans.to - trans.from) * k, r = lerpR(trans.R, F, e);
+      drawLayer(trans.outer, trans.R, r, 1, e < 0.5);
+      drawLayer(trans.inner, F, r, Math.min(1, e * 1.4), e >= 0.5);
+      if (t >= 1) { layer = trans.to === 1 ? trans.inner : trans.outer; trans = null; drawLayer(layer, F, F, 1, true); }
+    } else drawLayer(layer, F, F, 1, true);
+    if (scanning) {
+      const x = ((now - scanStart) / 900 % 1) * (W + 240) - 120, g = ctx.createLinearGradient(x - 120, 0, x + 120, 0);
+      g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,.13)"); g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  // ---------- scan, then interactive ----------
+  const scanText = document.getElementById("scantext"), scanStat = document.getElementById("scanstat");
+  const FILES = 1612408, DUR = 3200;
+  function setProgress(p) {
+    const walk = (n) => { if (n.c) n.c.forEach(walk); else { const q = Math.max(0, Math.min(1, (p - n.delay) / 0.45)); n.f = 1 - Math.pow(1 - q, 3); } };
+    walk(ROOT);
+  }
+  function scanFrame(now) {
+    if (!scanStart) scanStart = now;
+    const p = Math.min(1, (now - scanStart) / DUR);
+    setProgress(p);
+    scanText.innerHTML = '<span class="long">正在扫描 · </span>' + Math.round(FILES * Math.min(1, p * 1.02)).toLocaleString("en-US") + " 个文件 · " + (7.5 * p).toFixed(1) + " 秒";
+    layer = layoutOf(focus, F); renderSide(); draw(now);
+    if (p < 1) requestAnimationFrame(scanFrame); else finishScan();
+  }
+  function finishScan() {
+    scanning = false; setProgress(1); layer = layoutOf(focus, F);
+    scanStat.classList.add("done");
+    scanText.innerHTML = '<span class="long">扫描完成 · </span>' + FILES.toLocaleString("en-US") + " 个文件 · 7.5 秒 · " + fmt(value(ROOT));
+    renderSide(); draw(performance.now());
+  }
+
+  function animate(now) { draw(now); if (trans) requestAnimationFrame(animate); else { renderSide(); renderCrumbs(); } }
+  function zoomIn(node) {
+    if (trans || scanning || !node.c) return;
+    const t = layer.tiles.find((x) => x.n === node); if (!t) return;
+    trans = { outer: layer, inner: layoutOf(node, F), R: t.r, from: 0, to: 1, start: performance.now(), dur: reduce ? 1 : 720 };
+    focus = node; hover = null; tip.hidden = true; hint.style.opacity = 0; renderCrumbs();
+    requestAnimationFrame(animate);
+  }
+  function zoomTo(anc) {
+    if (trans || scanning || anc === focus) return;
+    let child = focus; while (child.parent !== anc) child = child.parent;
+    const outer = layoutOf(anc, F), t = outer.tiles.find((x) => x.n === child);
+    trans = { outer, inner: layer, R: t ? t.r : F, from: 1, to: 0, start: performance.now(), dur: reduce ? 1 : 640 };
+    focus = anc; hover = null; tip.hidden = true; renderCrumbs();
+    requestAnimationFrame(animate);
+  }
+
+  // ---------- hover + click ----------
+  function hit(e) {
+    const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    for (const t of layer.tiles) {
+      const R = t.r;
+      if (x >= R.x && x <= R.x + R.w && y >= R.y && y <= R.y + R.h) {
+        const s = t.subs.find((s) => x >= s.r.x && x <= s.r.x + s.r.w && y >= s.r.y && y <= s.r.y + s.r.h);
+        return { t, s, x, y };
+      }
+    }
+    return null;
+  }
+  canvas.addEventListener("mousemove", (e) => {
+    if (trans || scanning) return;
+    const h = hit(e); const changed = (h && h.t) !== (hover && hover.t); hover = h;
+    canvas.style.cursor = h && h.t.n.c ? "zoom-in" : "default";
+    if (!h) { tip.hidden = true; } else {
+      const n = h.s ? h.s.n : h.t.n;
+      tip.innerHTML = "<b>" + n.n + "</b>" + fmt(value(n)) + ' · 占这里的 ' + ((value(n) / value(focus)) * 100).toFixed(1) + "%" + '<div class="mono">' + n.path + "</div>" + (h.t.n.c ? "<em>点一下放大 " + h.t.n.n + "</em>" : "");
+      tip.hidden = false;
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      tip.style.left = Math.min(W - tw - 8, h.x + 14) + "px"; tip.style.top = (h.y + th + 20 > H ? h.y - th - 12 : h.y + 16) + "px";
+    }
+    if (changed) { draw(performance.now()); renderSide(); }
+  });
+  canvas.addEventListener("mouseleave", () => { hover = null; tip.hidden = true; if (!trans && !scanning) { draw(performance.now()); renderSide(); } });
+  canvas.addEventListener("click", (e) => { const h = hit(e); if (h && h.t.n.c) zoomIn(h.t.n); else if (!h && focus.parent) zoomTo(focus.parent); });
+
+  // ---------- breadcrumbs + side list ----------
+  const crumbs = document.getElementById("crumbs"), side = document.getElementById("side");
+  function renderCrumbs() {
+    const chain = []; for (let n = focus; n; n = n.parent) chain.unshift(n);
+    crumbs.innerHTML = "";
+    const pre = document.createElement("span"); pre.className = "sep"; pre.textContent = "Macintosh HD ›"; crumbs.append(pre);
+    chain.forEach((n, i) => {
+      if (i) { const s = document.createElement("span"); s.className = "sep"; s.textContent = "›"; crumbs.append(s); }
+      if (i === chain.length - 1) { const b = document.createElement("b"); b.textContent = n.n; crumbs.append(b); }
+      else { const b = document.createElement("button"); b.type = "button"; b.textContent = n.n; b.onclick = () => zoomTo(n); crumbs.append(b); }
+    });
+  }
+  function renderSide() {
+    const kids = focus.c.slice().sort((a, b) => value(b) - value(a)), max = value(kids[0]) || 1;
+    side.innerHTML = '<div class="side-h">' + fmt(value(focus)) + " · " + kids.length + " 项</div>";
+    for (const n of kids) {
+      const el = document.createElement(n.c ? "button" : "div");
+      el.className = "row" + (n.c ? " can" : "") + (hover && hover.t.n === n ? " hot" : "");
+      const col = KIND[kindOf(n)];
+      el.innerHTML = '<span class="sw" style="background:' + col + '"></span><span class="nm">' + n.n + '</span><span class="sz">' + fmt(value(n)) + '</span><span class="bar"><i style="width:' + ((value(n) / max) * 100).toFixed(1) + "%;background:" + col + '"></i></span>';
+      if (n.c) { el.type = "button"; el.onclick = () => zoomIn(n); }
+      side.append(el);
+    }
+  }
+
+  new ResizeObserver(resize).observe(box);
+  renderCrumbs();
+  if (scanning) { setProgress(0.08); resize(); requestAnimationFrame(scanFrame); } else { resize(); finishScan(); }
+
+  // ---------- cleanup suggestions ----------
+  const SUGG = [
+    { t: "Xcode 编译缓存", tag: ["safe", "安全"], s: 18.4, on: true, why: "DerivedData · 下次编译时会自动重新生成" },
+    { t: "web-app 的 node_modules", tag: ["idle", "94 天未动"], s: 14.2, on: true, why: "项目三个月没有改动 · 运行 npm install 即可恢复" },
+    { t: "旧版 iOS 设备支持文件", tag: ["safe", "安全"], s: 9.8, on: true, why: "iOS 16 与 17 · 连接这些系统的设备时会重新下载" },
+    { t: "Homebrew 下载缓存", tag: ["safe", "安全"], s: 4.4, on: true, why: "已经安装好的软件不受影响" },
+    { t: "下载文件夹里的安装包", tag: ["ask", "请确认"], s: 12.4, on: false, why: "23 个 .dmg，对应的应用都已经装好" },
+    { t: "Docker 未使用的镜像", tag: ["ask", "请确认"], s: 7.9, on: false, why: "删除后再用需要重新拉取" },
+  ];
+  const sugg = document.getElementById("sugg"), picked = document.getElementById("picked");
+  SUGG.forEach((o, i) => {
+    const l = document.createElement("label"); l.htmlFor = "sg" + i;
+    l.innerHTML = '<input type="checkbox" id="sg' + i + '"' + (o.on ? " checked" : "") + '><span class="t">' + o.t + ' <span class="tag ' + o.tag[0] + '">' + o.tag[1] + '</span></span><span class="sz">' + o.s.toFixed(1) + ' GB</span><span class="why">' + o.why + "</span>";
+    sugg.append(l);
+  });
+  const sum = () => { let s = 0; SUGG.forEach((o, i) => { if (document.getElementById("sg" + i).checked) s += o.s; }); picked.textContent = s.toFixed(1) + " GB"; };
+  sugg.addEventListener("change", sum); sum();
+
+  // ---------- timeline chart ----------
+  const APPS = [
+    { n: "Xcode", c: KIND.dev, v: [1.2, 2.1, 0.9, 1.8, 2.4, 0.3, 0.2, 1.6, 2.0, 1.1, 1.9, 2.2, 0.4, 1.3] },
+    { n: "Docker", c: KIND.sys, v: [0.4, 0.3, 0.6, 0.2, 0.5, 0.1, 6.2, 0.4, 0.3, 0.2, 0.5, 0.6, 0.1, 0.3] },
+    { n: "Final Cut Pro", c: KIND.media, v: [0, 0, 0.2, 0, 0, 0, 0, 0, 0, 4.8, 0.6, 0, 0, 0] },
+    { n: "Chrome", c: KIND.photo, v: [0.3, 0.4, 0.3, 0.5, 0.4, 0.2, 0.3, 0.4, 0.3, 0.4, 0.3, 0.4, 0.2, 0.3] },
+    { n: "其他", c: KIND.arch, v: [0.5, 0.6, 0.4, 0.7, 0.5, 0.3, 0.4, 0.6, 0.5, 0.4, 0.6, 0.5, 0.3, 0.4] },
+  ];
+  document.getElementById("legend").innerHTML = APPS.map((a) => '<span><i style="background:' + a.c + '"></i>' + a.n + "</span>").join("") + '<span class="mono" style="margin-left:auto">每天新写入 · GB</span>';
+  const svg = document.getElementById("chart"), NS = "http://www.w3.org/2000/svg";
+  const M = { l: 40, r: 12, t: 30, b: 34 }, VW = 760, VH = 300, PW = VW - M.l - M.r, PH = VH - M.t - M.b, YMAX = 8, N = 14;
+  const el = (tag, at, parent) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); (parent || svg).append(e); return e; };
+  const yOf = (v) => M.t + PH - (v / YMAX) * PH;
+  for (let v = 0; v <= YMAX; v += 2) {
+    el("line", { x1: M.l, x2: VW - M.r, y1: yOf(v), y2: yOf(v), stroke: v ? "rgba(148,170,214,.10)" : "rgba(148,170,214,.3)", "stroke-width": 1 });
+    el("text", { x: M.l - 10, y: yOf(v) + 4, "text-anchor": "end" }).textContent = v;
+  }
+  const slot = PW / N, bw = slot * 0.58, ctip = document.getElementById("ctip"), cbox = ctip.parentElement;
+  const NOTES = { 6: "Docker 拉取镜像 +6.2 GB", 9: "Final Cut 导入素材 +4.8 GB" };
+  for (let d = 0; d < N; d++) {
+    const g = el("g", { class: "bar-g" }), x = M.l + d * slot;
+    el("rect", { class: "hit", x, y: M.t, width: slot, height: PH, fill: "rgba(0,0,0,0)" }, g);
+    let acc = 0;
+    APPS.forEach((a) => { const v = a.v[d]; if (!v) return; el("rect", { x: x + (slot - bw) / 2, y: yOf(acc + v), width: bw, height: Math.max(0, yOf(acc) - yOf(acc + v) - 1.5), rx: 2.5, fill: a.c }, g); acc += v; });
+    if (d % 2 === 0 || d === N - 1) el("text", { x: x + slot / 2, y: VH - 12, "text-anchor": "middle" }).textContent = "10/" + (12 + d);
+    if (NOTES[d]) {
+      const cx = x + slot / 2, ty = yOf(acc) - 10;
+      el("text", { class: "note", x: d > N / 2 ? cx + 4 : cx - 4, y: ty, "text-anchor": d > N / 2 ? "start" : "end" }).textContent = NOTES[d];
+    }
+    g.addEventListener("mousemove", (e) => {
+      const tot = APPS.reduce((s, a) => s + a.v[d], 0);
+      ctip.innerHTML = "<div><b>10 月 " + (12 + d) + " 日</b><span class='mono'>" + tot.toFixed(1) + " GB</span></div>" + APPS.filter((a) => a.v[d]).map((a) => "<div><span><span style='color:" + a.c + "'>●</span> " + a.n + "</span><span class='mono'>" + a.v[d].toFixed(1) + "</span></div>").join("");
+      ctip.hidden = false;
+      const r = cbox.getBoundingClientRect(), tw = ctip.offsetWidth;
+      ctip.style.left = Math.min(r.width - tw - 8, Math.max(8, e.clientX - r.left + 14)) + "px"; ctip.style.top = (e.clientY - r.top + 14) + "px";
+    });
+    g.addEventListener("mouseleave", () => (ctip.hidden = true));
+  }
+
+  // ---------- counters + entrance lift ----------
+  if (!reduce && "IntersectionObserver" in window) {
+    const below = (e) => e.getBoundingClientRect().top > innerHeight;
+    const lifts = [...document.querySelectorAll(".lift")].filter(below);
+    lifts.forEach((e) => e.classList.add("pre"));
+    const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { en.target.classList.remove("pre"); io.unobserve(en.target); } }), { rootMargin: "0px 0px -8% 0px" });
+    lifts.forEach((e) => io.observe(e));
+    const nums = [...document.querySelectorAll("[data-count]")].filter(below);
+    const cio = new IntersectionObserver((es) => es.forEach((en) => {
+      if (!en.isIntersecting) return; cio.unobserve(en.target);
+      const n = en.target, end = parseFloat(n.dataset.count), dec = +n.dataset.dec, t0 = performance.now();
+      const step = (now) => { const t = Math.min(1, (now - t0) / 1100), v = end * (1 - Math.pow(1 - t, 3)); n.textContent = v.toFixed(dec); if (t < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }), { threshold: 0.6 });
+    nums.forEach((n) => cio.observe(n));
+  }
+})();
+</script>
