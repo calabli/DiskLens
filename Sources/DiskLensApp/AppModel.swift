@@ -346,6 +346,26 @@ final class AppModel {
     }
 }
 
+#if DEBUG
+extension AppModel {
+    func demoZoom(into relativePath: String) async {
+        while isScanning || tree == nil {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        try? await Task.sleep(for: .seconds(1.5))
+        guard let tree else { return }
+        var node = 0
+        for part in relativePath.split(separator: "/") {
+            guard let next = tree.children(of: node).first(where: { tree.names[Int($0)] == part }) else { return }
+            node = Int(next)
+        }
+        open(node)
+        try? await Task.sleep(for: .seconds(4))
+        goTo(0)
+    }
+}
+#endif
+
 /// Drag payload for a node, as plain text so it works with the standard String transfer type.
 enum NodeDrag {
     static let prefix = "disklens-node:"

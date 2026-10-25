@@ -17,6 +17,13 @@ struct DiskLensApp: App {
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
                         model.scan((args[i + 1] as NSString).expandingTildeInPath)
                     }
+                    #if DEBUG
+                    // `--demo-zoom <folder under the scan root>`: drill in and back out once
+                    // the scan is done, to watch the transitions without clicking.
+                    if let i = args.firstIndex(of: "--demo-zoom"), i + 1 < args.count {
+                        await model.demoZoom(into: args[i + 1])
+                    }
+                    #endif
                 }
         }
         .defaultSize(width: 1240, height: 780)

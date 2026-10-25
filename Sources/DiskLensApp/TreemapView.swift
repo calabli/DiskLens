@@ -13,31 +13,99 @@ struct TreemapPane: View {
 
 /// Squarified treemap of the folder being viewed. The blocks are drawn once per
 /// layout; hover, selection and basket marks are drawn on a light layer above.
+///
+/// Moving between folders is one camera move across two layers, the way
+/// Photos and Finder zoom: the map you leave and the map you arrive at stay
+/// locked together, scaled uniformly so text never stretches.
 struct TreemapView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var items: [TreemapItem] = []
     @State private var layoutID = 0
+    @State private var layoutSize: CGSize = .zero
     @State private var hovered: Int?
     @State private var hoverLocation: CGPoint?
-    @State private var zoom = Zoom.identity
+    @State private var tooltipShown = false
     @State private var pendingZoom: PendingZoom?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var transition: Transition?
+    @State private var transitionID = 0
 
-    /// Maps the new layout onto where it sat in the old one, animated back to identity.
-    private struct Zoom: Equatable {
-        var scaleX: CGFloat = 1
-        var scaleY: CGFloat = 1
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var opacity: Double = 1
-        static let identity = Zoom()
-    }
+    #if DEBUG
+    /// DISKLENS_ANIMATION_SCALE=10 slows transitions down to inspect them frame by frame.
+    nonisolated static let animationScale = ProcessInfo.processInfo.environment["DISKLENS_ANIMATION_SCALE"].flatMap(Double.init) ?? 1
+    #else
+    nonisolated static let animationScale = 1.0
+    #endif
 
     private enum PendingZoom {
         /// Drilled into a folder that was drawn at this rect.
         case into(CGRect)
         /// Went up from this folder, which the new layout draws somewhere inside.
         case outOf(Int)
+    }
+
+    /// The outgoing map, kept on screen while the incoming one takes over.
+    enum TransitionKind: Sendable {
+        case zoomIn(Camera)
+        case zoomOut(Camera)
+        case fade
+    }
+
+    private struct Transition {
+        let items: [TreemapItem]
+        let layoutID: Int
+        let kind: TransitionKind
+
+        var duration: Double {
+            if case .fade = kind { return 0.22 * TreemapView.animationScale }
+            return 0.48 * TreemapView.animationScale
+        }
+    }
+
+    /// A zoom from the whole view into `frame` (a rect with the view's aspect
+    /// ratio), around the one point that stays put, so both layers move as one.
+    struct Camera: Sendable {
+        let frame: CGRect
+        let scale: CGFloat
+        let fixedPoint: CGPoint
+
+        /// The largest rect with the view's aspect ratio centered inside `rect`,
+        /// so the zoom grows out of the block itself.
+        init?(zoomingInto rect: CGRect, viewSize size: CGSize) {
+            guard rect.width > 1, rect.height > 1, size.width > 1, size.height > 1 else { return nil }
+            let aspect = size.width / size.height
+            var frame = rect
+            if rect.width / rect.height > aspect {
+                frame.size.width = rect.height * aspect
+                frame.origin.x = rect.midX - frame.width / 2
+            } else {
+                frame.size.height = rect.width / aspect
+                frame.origin.y = rect.midY - frame.height / 2
+            }
+            let scale = size.width / frame.width
+            guard scale > 1.01 else { return nil }
+            self.frame = frame
+            self.scale = scale
+            fixedPoint = CGPoint(x: frame.minX / (1 - 1 / scale), y: frame.minY / (1 - 1 / scale))
+        }
+
+        /// Exponential scale reads as constant speed, like Maps and Photos.
+        private func zoom(_ progress: CGFloat) -> CGFloat { pow(scale, progress) }
+
+        /// The outer map at `progress` (0 = as it was, 1 = zoomed so `frame` fills the view).
+        func outer(_ progress: CGFloat) -> CGAffineTransform {
+            let k = zoom(progress)
+            return CGAffineTransform(a: k, b: 0, c: 0, d: k,
+                                     tx: fixedPoint.x * (1 - k), ty: fixedPoint.y * (1 - k))
+        }
+
+        /// The inner map drawn into `frame` of the outer one, then zoomed with it.
+        func inner(_ progress: CGFloat) -> CGAffineTransform {
+            let k = zoom(progress)
+            return CGAffineTransform(a: k / scale, b: 0, c: 0, d: k / scale,
+                                     tx: fixedPoint.x + (frame.minX - fixedPoint.x) * k,
+                                     ty: fixedPoint.y + (frame.minY - fixedPoint.y) * k)
+        }
     }
 
     private struct LayoutKey: Equatable {
@@ -50,19 +118,16 @@ struct TreemapView: View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 if let tree = model.tree {
-                    ZStack(alignment: .topLeading) {
-                        TreemapBlocks(items: items, tree: tree, layoutID: layoutID)
-                            .equatable()
-                        highlights(tree: tree)
-                    }
-                    .scaleEffect(x: zoom.scaleX, y: zoom.scaleY, anchor: .topLeading)
-                    .offset(x: zoom.x, y: zoom.y)
-                    .opacity(zoom.opacity)
-                    if let hovered, hovered < items.count {
+                    layers(tree: tree)
+                    SelectionRing(rect: selectionRect)
+                        .opacity(transition == nil ? 1 : 0)
+                        .animation(.smooth(duration: 0.18), value: transition == nil)
+                    if tooltipShown, let hovered, hovered < items.count, transition == nil {
                         Tooltip(item: items[hovered], tree: tree)
                             .fixedSize()
                             .position(tooltipPosition(in: geo.size))
                             .allowsHitTesting(false)
+                            .transition(.opacity)
                     }
                 }
             }
@@ -77,6 +142,17 @@ struct TreemapView: View {
                     hoverLocation = nil
                     hovered = nil
                 }
+            }
+            .task(id: hovered == nil) {
+                // Like macOS help tags: a short wait before the first one, then
+                // they follow the pointer without delay until it leaves the map.
+                guard hovered != nil else {
+                    tooltipShown = false
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.12)) { tooltipShown = true }
             }
             .gesture(
                 SpatialTapGesture(count: 2)
@@ -104,60 +180,87 @@ struct TreemapView: View {
         .accessibilityLabel("方块图，与左侧列表显示相同的内容")
     }
 
+    /// Both maps, driven by one progress value from 0 to 1 per transition.
+    private func layers(tree: FileTree) -> some View {
+        let current = MapLayer(items: items, tree: tree, layoutID: layoutID,
+                               marks: transition == nil ? Marks(basket: Set(model.basket), hovered: hovered) : nil)
+        let outgoing = transition.map { MapLayer(items: $0.items, tree: tree, layoutID: $0.layoutID, marks: nil) }
+        let kind = transition?.kind
+        let duration = transition?.duration ?? 0.48
+        return Color.clear
+            .keyframeAnimator(initialValue: CGFloat(0), trigger: transitionID) { _, t in
+                TransitionStack(progress: t, kind: kind, current: current, outgoing: outgoing)
+            } keyframes: { _ in
+                // Critically damped, like the system's own zooms: quick start, no bounce.
+                SpringKeyframe(CGFloat(1), duration: duration, spring: .smooth(duration: duration))
+            }
+    }
+
     private var hoveredNode: Int? {
         guard let hovered, hovered < items.count else { return nil }
         return Int(items[hovered].node)
     }
 
-    private func highlights(tree: FileTree) -> some View {
-        Canvas { ctx, _ in
-            for item in items where model.basket.contains(Int(item.node)) {
-                ctx.fill(Path(item.rect), with: .color(.black.opacity(0.45)))
-                if item.rect.width > 28 && item.rect.height > 28 {
-                    ctx.draw(Image(systemName: "tray.full"), at: CGPoint(x: item.rect.midX, y: item.rect.midY))
-                }
-            }
-            if let selection = model.selection,
-               let item = items.first(where: { Int($0.node) == selection && $0.depth == 1 }) {
-                ctx.stroke(Path(item.rect.insetBy(dx: 1.25, dy: 1.25)), with: .color(.accentColor), lineWidth: 2.5)
-            }
-            if let hovered, hovered < items.count {
-                ctx.stroke(Path(items[hovered].rect.insetBy(dx: 0.75, dy: 0.75)),
-                           with: .color(.primary.opacity(0.9)), lineWidth: 1.5)
-            }
-        }
-        .allowsHitTesting(false)
+    private var selectionRect: CGRect? {
+        guard let selection = model.selection else { return nil }
+        return items.first(where: { Int($0.node) == selection && $0.depth == 1 })?.rect
     }
 
     private func relayout(size: CGSize) async {
         guard let tree = model.tree, size.width > 1, size.height > 1 else { return }
-        // Coalesce bursts of size changes while the window or split view is being dragged.
-        try? await Task.sleep(for: .milliseconds(30))
-        guard !Task.isCancelled else { return }
+        let navigating = pendingZoom != nil
+        if size != layoutSize && !navigating {
+            // Coalesce bursts of size changes while the window or split view is being dragged.
+            try? await Task.sleep(for: .milliseconds(30))
+            guard !Task.isCancelled else { return }
+        }
         let root = model.current
         let bounds = CGRect(origin: .zero, size: size)
         let result = await Task.detached(priority: .userInitiated) {
             TreemapLayout.layout(tree, root: root, in: bounds)
         }.value
         guard !Task.isCancelled else { return }
-        let start = pendingZoom.flatMap { zoomStart(for: $0, in: result, size: size) }
+
+        let kind = transitionKind(into: result, size: size)
+        let resized = size != layoutSize
+        let outgoing = items
+        let outgoingID = layoutID
         pendingZoom = nil
         items = result
         layoutID += 1
+        layoutSize = size
         // Keep the tooltip on whatever is under the cursor now (the map refreshes during a scan).
         hovered = hoverLocation.flatMap(hitTest)
 
-        if let start {
-            zoom = start
-            try? await Task.sleep(for: .milliseconds(16))
-            withAnimation(.easeOut(duration: 0.28)) { zoom = .identity }
-        } else {
-            zoom = .identity
+        guard let kind, !outgoing.isEmpty, !resized || navigating else {
+            transition = nil
+            return
+        }
+        let next = Transition(items: outgoing, layoutID: outgoingID, kind: kind)
+        transition = next
+        transitionID += 1
+        let id = transitionID
+        try? await Task.sleep(for: .seconds(next.duration))
+        if transitionID == id { transition = nil }
+    }
+
+    private func transitionKind(into newItems: [TreemapItem], size: CGSize) -> TransitionKind? {
+        switch pendingZoom {
+        case let .into(rect):
+            if reduceMotion { return .fade }
+            return Camera(zoomingInto: rect, viewSize: size).map { .zoomIn($0) } ?? .fade
+        case let .outOf(node):
+            if reduceMotion { return .fade }
+            let rect = newItems.first(where: { Int($0.node) == node })?.rect
+            return rect.flatMap { Camera(zoomingInto: $0, viewSize: size) }.map { .zoomOut($0) } ?? .fade
+        case nil:
+            // A refresh during a scan: blend into the grown map instead of jumping.
+            return model.isScanning && transition == nil ? .fade : nil
         }
     }
 
     private func prepareZoom(from old: Int, to new: Int) {
-        guard !reduceMotion, let tree = model.tree else {
+        guard let tree = model.tree else {
             pendingZoom = nil
             return
         }
@@ -167,22 +270,6 @@ struct TreemapView: View {
             pendingZoom = .outOf(old)
         } else {
             pendingZoom = nil
-        }
-    }
-
-    private func zoomStart(for pending: PendingZoom, in newItems: [TreemapItem], size: CGSize) -> Zoom? {
-        switch pending {
-        case let .into(rect):
-            // The new map starts squeezed into the block that was double-clicked.
-            return Zoom(scaleX: rect.width / size.width, scaleY: rect.height / size.height,
-                        x: rect.minX, y: rect.minY, opacity: 0.4)
-        case let .outOf(node):
-            // The new map starts blown up so the folder we left fills the view.
-            guard let rect = newItems.first(where: { Int($0.node) == node })?.rect,
-                  rect.width > 0, rect.height > 0 else { return nil }
-            let sx = size.width / rect.width
-            let sy = size.height / rect.height
-            return Zoom(scaleX: sx, scaleY: sy, x: -rect.minX * sx, y: -rect.minY * sy, opacity: 0.4)
         }
     }
 
@@ -267,6 +354,93 @@ private struct TreemapBlocks: View, @MainActor Equatable {
                 layer.draw(detail, at: CGPoint(x: rect.minX, y: rect.minY + 13), anchor: .topLeading)
             }
         }
+    }
+}
+
+/// Pointer and basket marks drawn over the current map.
+private struct Marks: Equatable, Sendable {
+    var basket: Set<Int>
+    var hovered: Int?
+}
+
+/// One map's blocks, plus its marks when it is the map being browsed.
+private struct MapLayer: View, Sendable {
+    let items: [TreemapItem]
+    let tree: FileTree
+    let layoutID: Int
+    let marks: Marks?
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TreemapBlocks(items: items, tree: tree, layoutID: layoutID)
+                .equatable()
+            if let marks {
+                Canvas { ctx, _ in
+                    for item in items where marks.basket.contains(Int(item.node)) {
+                        ctx.fill(Path(item.rect), with: .color(.black.opacity(0.45)))
+                        if item.rect.width > 28 && item.rect.height > 28 {
+                            ctx.draw(Image(systemName: "tray.full"), at: CGPoint(x: item.rect.midX, y: item.rect.midY))
+                        }
+                    }
+                    if let hovered = marks.hovered, hovered < items.count {
+                        ctx.stroke(Path(items[hovered].rect.insetBy(dx: 0.75, dy: 0.75)),
+                                   with: .color(.primary.opacity(0.9)), lineWidth: 1.5)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        // Opaque, so the map on top fully covers the one underneath once it has faded in;
+        // the blocks themselves are translucent and would otherwise show both at once.
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+/// Places the outgoing and current maps for one frame of a transition.
+private struct TransitionStack: View {
+    let progress: CGFloat
+    let kind: TreemapView.TransitionKind?
+    let current: MapLayer
+    let outgoing: MapLayer?
+
+    var body: some View {
+        let t = progress
+        ZStack(alignment: .topLeading) {
+            switch kind {
+            case let .zoomIn(camera)?:
+                outgoing.transformEffect(camera.outer(t))
+                current
+                    .transformEffect(camera.inner(t))
+                    .opacity(Double(min(1, t / 0.35)))
+            case let .zoomOut(camera)?:
+                current.transformEffect(camera.outer(1 - t))
+                outgoing
+                    .transformEffect(camera.inner(1 - t))
+                    .opacity(Double(min(1, (1 - t) / 0.35)))
+            case .fade?:
+                outgoing
+                current.opacity(Double(t))
+            case nil:
+                current
+            }
+        }
+    }
+}
+
+/// The accent outline around the selected block. It glides to a new block
+/// instead of jumping, like a selection moving in Finder's icon view.
+private struct SelectionRing: View {
+    let rect: CGRect?
+
+    var body: some View {
+        let frame = rect ?? .zero
+        RoundedRectangle(cornerRadius: 3)
+            .strokeBorder(Color.accentColor, lineWidth: 2.5)
+            .frame(width: frame.width, height: frame.height)
+            .offset(x: frame.minX, y: frame.minY)
+            .opacity(rect == nil ? 0 : 1)
+            .animation(.smooth(duration: 0.22), value: rect)
+            .allowsHitTesting(false)
     }
 }
 
