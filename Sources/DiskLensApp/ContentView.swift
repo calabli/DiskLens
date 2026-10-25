@@ -6,6 +6,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(AccessModel.self) private var access
+    @Environment(TrashWatcher.self) private var trashWatcher
     @Environment(BackgroundRecording.self) private var recording
 
     var body: some View {
@@ -43,7 +44,13 @@ struct ContentView: View {
                 .environment(access)
                 .environment(recording)
         }
+        .sheet(item: Binding(get: { access.showGuide ? nil : trashWatcher.pending.map(PendingLeftovers.init) },
+                             set: { if $0 == nil { trashWatcher.pending = nil } })) { pending in
+            LeftoversSheet(footprint: pending.footprint)
+                .environment(model)
+        }
         .task { access.showOnFirstLaunchIfNeeded() }
+        .onChange(of: access.isGranted) { if access.isGranted { trashWatcher.start() } }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             access.refresh()
         }
@@ -219,6 +226,8 @@ struct MainSplitView: View {
                     .tag(AppModel.Section.cleanup)
                 Label("大文件", systemImage: "doc.text.magnifyingglass")
                     .tag(AppModel.Section.largeFiles)
+                Label("应用", systemImage: "app.badge")
+                    .tag(AppModel.Section.apps)
                 Label("重复文件", systemImage: "doc.on.doc")
                     .badge(duplicatesBadge)
                     .tag(AppModel.Section.duplicates)
@@ -248,6 +257,8 @@ struct MainSplitView: View {
                     DuplicatesView()
                 case .storage:
                     StorageView()
+                case .apps:
+                    AppsView()
                 }
                 Divider()
                 BasketBar()

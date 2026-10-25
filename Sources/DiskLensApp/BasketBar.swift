@@ -9,9 +9,9 @@ struct BasketBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Label("收集筐", systemImage: model.basket.isEmpty ? "tray" : "tray.full")
+            Label("收集筐", systemImage: model.basketIsEmpty ? "tray" : "tray.full")
                 .font(.headline)
-            if model.basket.isEmpty {
+            if model.basketIsEmpty {
                 Text("把要删除的项目拖到这里，或右键选择“加入收集筐”（也可以按 ⌫）")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -21,6 +21,9 @@ struct BasketBar: View {
                     HStack(spacing: 6) {
                         ForEach(model.basket, id: \.self) { node in
                             BasketChip(node: node)
+                        }
+                        ForEach(model.externalBasket) { item in
+                            ExternalChip(item: item)
                         }
                     }
                 }
@@ -43,12 +46,46 @@ struct BasketBar: View {
             nodes.forEach(model.addToBasket)
             return !nodes.isEmpty
         } isTargeted: { isTargeted = $0 }
-        .confirmationDialog("把 \(model.basket.count) 项（\(ByteFormat.string(model.basketTotal))）移到废纸篓？",
+        .confirmationDialog("把 \(model.basketCount) 项（\(ByteFormat.string(model.basketTotal))）移到废纸篓？",
                             isPresented: $confirming) {
             Button("移到废纸篓", role: .destructive) { model.trashBasket() }
         } message: {
             Text("之后可以在废纸篓中恢复。清倒废纸篓后才会真正释放空间。")
         }
+    }
+}
+
+/// A basket item outside the scan, such as an app bundle.
+private struct ExternalChip: View {
+    @Environment(AppModel.self) private var model
+    let item: AppModel.ExternalItem
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+                .resizable()
+                .frame(width: 16, height: 16)
+            Text(item.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: 160)
+            Text(ByteFormat.string(item.size))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Button {
+                model.removeFromBasket(path: item.path)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("从收集筐移除")
+        }
+        .font(.callout)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.06), in: Capsule())
+        .help(item.path)
     }
 }
 

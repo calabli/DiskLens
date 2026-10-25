@@ -84,6 +84,7 @@ final class AppModel {
         case timeline
         case duplicates
         case storage
+        case apps
     }
 
     var section: Section = .overview
@@ -592,9 +593,43 @@ final class AppModel {
 
     // MARK: Basket
 
+    /// A file or folder outside the scanned tree (an app in /Applications, say).
+    struct ExternalItem: Identifiable, Hashable {
+        let path: String
+        let size: Int64
+        var id: String { path }
+        var name: String { (path as NSString).lastPathComponent }
+    }
+
+    /// Basket items that are not in the scanned tree.
+    private(set) var externalBasket: [ExternalItem] = []
+
+    var basketCount: Int { basket.count + externalBasket.count }
+    var basketIsEmpty: Bool { basket.isEmpty && externalBasket.isEmpty }
+
     var basketTotal: Int64 {
-        guard let tree else { return 0 }
-        return basket.reduce(0) { $0 + tree.totalSizes[$1] }
+        let inTree = tree.map { tree in basket.reduce(Int64(0)) { $0 + tree.totalSizes[$1] } } ?? 0
+        return inTree + externalBasket.reduce(0) { $0 + $1.size }
+    }
+
+    /// Adds a path, as a node when the scan has it, else as an external item.
+    func addToBasket(path: String, size: Int64) {
+        if let tree, let node = tree.node(atPath: path), node > 0 {
+            addToBasket(node)
+            return
+        }
+        guard !isInBasket(path: path) else { return }
+        externalBasket.removeAll { $0.path.hasPrefix(path + "/") }
+        externalBasket.append(ExternalItem(path: path, size: size))
+    }
+
+    func isInBasket(path: String) -> Bool {
+        if let tree, let node = tree.node(atPath: path), node > 0 { return isInBasket(node) }
+        return externalBasket.contains { path == $0.path || path.hasPrefix($0.path + "/") }
+    }
+
+    func removeFromBasket(path: String) {
+        externalBasket.removeAll { $0.path == path }
     }
 
     func isInBasket(_ node: Int) -> Bool {
@@ -616,11 +651,14 @@ final class AppModel {
 
     func clearBasket() {
         basket = []
+        externalBasket = []
     }
 
     /// Moves every basket item to the Trash and takes it out of the tree.
     func trashBasket() {
-        guard !isBusy, var tree else { return }
+        guard !isBusy else { return }
+        trashExternalItems()
+        guard var tree else { return }
         var failures: [String] = []
         for node in basket {
             let url = URL(fileURLWithPath: tree.path(of: node))
@@ -649,6 +687,30 @@ final class AppModel {
             alertMessage = "有 \(failures.count) 项没能移到废纸篓：\n" + failures.prefix(5).joined(separator: "\n")
         }
     }
+
+    /// Items outside the scan go through Finder's own recycling, which asks for an
+    /// administrator password where Finder would (apps installed from the App Store).
+    private func trashExternalItems() {
+        let items = externalBasket
+        guard !items.isEmpty else { return }
+        externalBasket = []
+        NSWorkspace.shared.recycle(items.map { URL(fileURLWithPath: $0.path) }) { [weak self] recycled, error in
+            Task { @MainActor in
+                guard let self else { return }
+                let failed = items.filter { recycled[URL(fileURLWithPath: $0.path)] == nil }
+                if !failed.isEmpty {
+                    self.alertMessage = "有 \(failed.count) 项没能移到废纸篓"
+                        + (error.map { "：\($0.localizedDescription)" } ?? "")
+                        + "\n" + failed.prefix(5).map(\.name).joined(separator: "\n")
+                }
+                self.externalItemsRecycled += 1
+                if let path = self.lastScanPath { self.volume = VolumeInfo(path: path) }
+            }
+        }
+    }
+
+    /// Bumped after items outside the scan went to the Trash, so lists of apps can reload.
+    private(set) var externalItemsRecycled = 0
 }
 
 #if DEBUG

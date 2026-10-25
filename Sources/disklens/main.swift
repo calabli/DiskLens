@@ -10,6 +10,7 @@ let usage = """
       --all-volumes  descend into other mounted volumes
       --kb           print only the total in 1024-byte blocks, like `du -sk`
       --suggest      print cleanup suggestions instead of the largest items
+      --app NAME     list everything an installed app has on disk (no path needed)
       --duplicates   list files with identical contents (1 MB and larger, outside ~/Library)
       --use-cache    update the saved scan from the change journal instead of rescanning,
                      then print what changed and save the new result
@@ -22,6 +23,7 @@ var kbOnly = false
 var suggest = false
 var useCache = false
 var duplicates = false
+var appQuery: String?
 var options = ScanOptions()
 
 var args = CommandLine.arguments.dropFirst().makeIterator()
@@ -42,6 +44,8 @@ while let arg = args.next() {
     case "--suggest": suggest = true
     case "--use-cache": useCache = true
     case "--duplicates": duplicates = true
+    case "--app":
+        appQuery = args.next()
     case "-h", "--help":
         print(usage)
         exit(0)
@@ -53,9 +57,27 @@ while let arg = args.next() {
         path = arg
     }
 }
-guard let path else {
+guard let path = path ?? (appQuery != nil ? "~" : nil) else {
     print(usage)
     exit(2)
+}
+if let appQuery {
+    // `disklens --app <name>`: list everything an app has on disk.
+    let installed = AppCatalog.installedApps()
+    guard let app = installed.first(where: { $0.name.localizedCaseInsensitiveContains(appQuery) }) else {
+        print("no installed app matches \(appQuery)")
+        exit(1)
+    }
+    let started = Date()
+    let footprint = AppFootprintFinder(installed: installed).footprint(of: app)
+    print("\(app.name) \(app.version ?? "") · \(app.bundleID) · team \(app.teamID ?? "-") · helpers \(app.helperIDs.count)")
+    print("app \(ByteFormat.string(footprint.files[0].size)) + data \(ByteFormat.string(footprint.dataSize)) · \(String(format: "%.2f", Date().timeIntervalSince(started))) s\n")
+    for file in footprint.files.dropFirst() {
+        let flags = (file.confidence == .certain ? "certain" : "likely ") + (file.requiresAdmin ? " admin" : "")
+        print("  \(ByteFormat.string(file.size).padding(toLength: 9, withPad: " ", startingAt: 0)) \(flags)  \((file.path as NSString).abbreviatingWithTildeInPath)")
+    }
+    if let command = footprint.adminCommand { print("\nadmin:\n\(command)") }
+    exit(0)
 }
 let rootPath = (path as NSString).expandingTildeInPath
 

@@ -8,6 +8,8 @@ struct DiskLensApp: App {
     @State private var recording = BackgroundRecording()
     @State private var monitor = SpaceMonitor()
     @State private var access = AccessModel()
+    @State private var uninstaller = AppUninstaller()
+    @State private var trashWatcher = TrashWatcher()
     @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
 
     init() {
@@ -21,8 +23,13 @@ struct DiskLensApp: App {
                 .environment(recording)
                 .environment(monitor)
                 .environment(access)
+                .environment(uninstaller)
+                .environment(trashWatcher)
                 .frame(minWidth: 960, minHeight: 600)
-                .task { monitor.start() }
+                .task {
+                    monitor.start()
+                    trashWatcher.start()
+                }
                 .task {
                     // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes` opens
                     // that page, for development and scripting.
@@ -42,8 +49,13 @@ struct DiskLensApp: App {
                         case "timeline": model.section = .timeline
                         case "duplicates": model.section = .duplicates
                         case "storage": model.section = .storage
+                        case "apps": model.section = .apps
                         default: break
                         }
+                    }
+                    if let i = args.firstIndex(of: "--select-app"), i + 1 < args.count {
+                        while uninstaller.apps.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
+                        uninstaller.selection = uninstaller.apps.first { $0.name.localizedCaseInsensitiveContains(args[i + 1]) }?.path
                     }
                     #if DEBUG
                     // `--demo-zoom <folder under the scan root>`: drill in and back out once

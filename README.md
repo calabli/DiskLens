@@ -59,6 +59,18 @@ Every finished scan is saved to `~/Library/Caches/app.disklens.DiskLens/Scans` (
 
 Records are kept for 90 days. The 空间时间线 page charts the daily or hourly change in used space, and for the whole range or a clicked bar it lists the sources of growth (expandable to folders) and the apps that wrote the most.
 
+## Uninstalling apps
+
+The 应用 page lists the apps in /Applications and ~/Applications with the size of each app and of the data it keeps elsewhere. `AppFootprintFinder` looks for that data in containers, group containers, Application Support, caches, preferences (including ByHost), saved state, web data, logs, crash reports, launch agents and daemons, privileged helpers and installer receipts:
+
+- **Certain:** the name is one of the app's identifiers or a helper's (`com.app.Id`, `com.app.Id.ShipIt`, `group.com.app.Id`), or a launch agent runs a program inside the app. When identifiers nest (`com.google.Chrome` and `com.google.Chrome.canary`), the longest match decides who owns the data.
+- **Likely** (not ticked by default): folders named after the app (`Application Support/Google/Chrome`), group containers of the app's developer team, and the vendor's updater agents. These are skipped entirely while another app of the same vendor is installed.
+- Items in /Library need an administrator, so they are listed with the `launchctl bootout` / `rm` / `pkgutil --forget` commands to run instead of going to the basket.
+
+Uninstalling puts the app and the ticked items in the basket; items outside the scan are moved with `NSWorkspace.recycle`, which asks for a password where Finder would. While DiskLens runs (also from the menu bar) it watches the Trash: when an app lands there, it offers to clean up what the app left behind. Watching the Trash needs Full Disk Access.
+
+`disklens --app <name>` prints an app's footprint in Terminal.
+
 ## Duplicates, storage details and the menu bar
 
 - **Duplicates:** `DuplicateFinder` compares only files of equal size from the scan, first by exact length, then by a SHA-256 of their first and last 16 KB, then by a full SHA-256, reading with `F_NOCACHE`. It reads each file's private size (`ATTR_CMNEXT_PRIVATESIZE`), so APFS clones, which share their blocks, are not counted as reclaimable. Files in app bundles, dependency folders (`node_modules`…), hidden folders (`.git`…) and, unless asked, `~/Library` are left out: identical copies there belong to tools, and deleting one breaks its owner. On a home folder with 1.6M entries a search takes about half a second with a warm cache.
