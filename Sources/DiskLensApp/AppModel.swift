@@ -78,6 +78,7 @@ final class AppModel {
         case cleanup
         case largeFiles
         case changes
+        case timeline
     }
 
     var section: Section = .overview

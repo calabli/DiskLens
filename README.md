@@ -47,6 +47,16 @@ Every finished scan is saved to `~/Library/Caches/app.disklens.DiskLens/Scans` (
 
 `disklens <path> --use-cache` does the same in Terminal and prints the timings.
 
+## Background recording and the space timeline
+
+`DiskLensAgent` runs as a login item (registered with `SMAppService` when the user turns on 后台记录) at background CPU and I/O priority, using about 1% CPU and 11 MB of memory. Every minute it adds to `~/Library/Application Support/app.disklens.DiskLens/activity.sqlite`:
+
+- **Writes per app:** sampled every 10 s from each process's disk-write counter (`proc_pid_rusage`). Helper processes count toward the outermost `.app` they live in. Only the user's own processes are visible, and processes that start and exit between samples are missed.
+- **Growth per folder:** a live FSEvents stream (30 s latency) reports changed folders. The agent re-reads each one a single level deep and records the change in size of the files directly inside. Folders are attributed to an owner by path (`FolderOwner`).
+- **Used space** of the home folder's volume.
+
+Records are kept for 90 days. The 空间时间线 page charts the daily or hourly change in used space, and for the whole range or a clicked bar it lists the sources of growth (expandable to folders) and the apps that wrote the most.
+
 ## Cleanup suggestions
 
 `CleanupAdvisor` turns a scanned tree into suggestions in three tiers: safe to clean (caches and anything rebuilt automatically), review (probably unneeded, check each item), and info only (clean with a command, or not at all). It only ever suggests items inside the home folder, and it reads the tree in memory, so it takes well under a second.

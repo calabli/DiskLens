@@ -6,12 +6,46 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 swift build -c release --product DiskLensApp
+swift build -c release --product DiskLensAgent
 BIN_DIR="$(swift build -c release --show-bin-path)"
 
 APP=build/DiskLens.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/DiskLensApp" "$APP/Contents/MacOS/DiskLens"
+# The background agent, registered as a login item by the app (SMAppService).
+cp "$BIN_DIR/DiskLensAgent" "$APP/Contents/MacOS/DiskLensAgent"
+mkdir -p "$APP/Contents/Library/LaunchAgents"
+cat > "$APP/Contents/Library/LaunchAgents/app.disklens.DiskLens.agent.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>app.disklens.DiskLens.agent</string>
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/DiskLensAgent</string>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>app.disklens.DiskLens</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
+PLIST
+
 # Resources of the core library, such as the cleanup rules (found through Bundle.module).
 cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
 
@@ -46,5 +80,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+# Nested code first, then the app that seals it.
+codesign --force --sign - --identifier app.disklens.DiskLens.agent "$APP/Contents/MacOS/DiskLensAgent"
 codesign --force --sign - "$APP"
 echo "Built $APP"

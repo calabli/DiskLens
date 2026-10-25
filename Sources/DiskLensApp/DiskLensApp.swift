@@ -5,11 +5,13 @@ import SwiftUI
 struct DiskLensApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
+    @State private var recording = BackgroundRecording()
 
     var body: some Scene {
         Window("DiskLens", id: "main") {
             ContentView()
                 .environment(model)
+                .environment(recording)
                 .frame(minWidth: 960, minHeight: 600)
                 .task {
                     // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes` opens
@@ -23,6 +25,7 @@ struct DiskLensApp: App {
                         case "cleanup": model.section = .cleanup
                         case "large-files": model.section = .largeFiles
                         case "changes": model.section = .changes
+                        case "timeline": model.section = .timeline
                         default: break
                         }
                     }

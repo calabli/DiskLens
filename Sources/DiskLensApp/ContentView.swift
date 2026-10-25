@@ -206,6 +206,8 @@ struct MainSplitView: View {
                 Label("变化", systemImage: "clock.arrow.circlepath")
                     .badge(model.comparison.map { Text($0.delta.signedBytes) })
                     .tag(AppModel.Section.changes)
+                Label("空间时间线", systemImage: "chart.bar.xaxis")
+                    .tag(AppModel.Section.timeline)
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
         } detail: {
@@ -219,6 +221,8 @@ struct MainSplitView: View {
                     LargeFilesView()
                 case .changes:
                     ChangesView()
+                case .timeline:
+                    TimelineView()
                 }
                 Divider()
                 BasketBar()
