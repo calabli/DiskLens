@@ -45,6 +45,7 @@ public final class ActivityStore: @unchecked Sendable {
             CREATE TABLE IF NOT EXISTS growth (minute INTEGER, folder TEXT, owner TEXT, bytes INTEGER,
                                                PRIMARY KEY (minute, folder));
             CREATE TABLE IF NOT EXISTS volume (minute INTEGER PRIMARY KEY, used INTEGER, available INTEGER);
+            CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT, updated INTEGER);
             """)
     }
 
@@ -86,6 +87,18 @@ public final class ActivityStore: @unchecked Sendable {
         for table in ["writes", "growth", "volume"] {
             try transaction("DELETE FROM \(table) WHERE minute < ?", rows: [[.int(cutoff)]])
         }
+    }
+
+    /// A small status value the agent reports for the app, such as its own permissions.
+    public func setMeta(_ key: String, _ value: String) throws {
+        try transaction("INSERT OR REPLACE INTO meta (key, value, updated) VALUES (?, ?, ?)",
+                        rows: [[.text(key), .text(value), .int(Int64(Date().timeIntervalSince1970))]])
+    }
+
+    public func meta(_ key: String) -> (value: String, updated: Date)? {
+        query("SELECT value, updated FROM meta WHERE key = ?", [.text(key)]) { row in
+            (row.text(0), Date(timeIntervalSince1970: TimeInterval(row.int(1))))
+        }.first
     }
 
     // MARK: Reading (app)

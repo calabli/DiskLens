@@ -5,6 +5,8 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(AccessModel.self) private var access
+    @Environment(BackgroundRecording.self) private var recording
 
     var body: some View {
         @Bindable var model = model
@@ -35,6 +37,16 @@ struct ContentView: View {
         .toolbar { MainToolbar() }
         .navigationTitle(model.tree.map { ($0.rootPath as NSString).abbreviatingWithTildeInPath } ?? "DiskLens")
         .quickLookPreview($model.previewURL)
+        .sheet(isPresented: Binding(get: { access.showGuide }, set: { access.showGuide = $0 })) {
+            FullDiskAccessGuide()
+                .environment(model)
+                .environment(access)
+                .environment(recording)
+        }
+        .task { access.showOnFirstLaunchIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            access.refresh()
+        }
         .alert("操作未完成", isPresented: Binding(get: { model.alertMessage != nil },
                                               set: { if !$0 { model.alertMessage = nil } })) {
             Button("好") { model.alertMessage = nil }
@@ -111,23 +123,27 @@ struct WelcomeView: View {
 }
 
 struct FullDiskAccessHint: View {
+    @Environment(AccessModel.self) private var access
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "lock.shield")
-                .foregroundStyle(.secondary)
-            Text("要扫描邮件、信息、废纸篓等受保护的位置，需要在系统设置中为 DiskLens 打开“完全磁盘访问权限”。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Button("打开设置") { openFullDiskAccessSettings() }
-                .buttonStyle(.link)
-                .font(.callout)
+            if access.isGranted {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+                Text("已获得完全磁盘访问权限，可以扫描到邮件、信息、废纸篓等受保护的位置。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "lock.shield")
+                    .foregroundStyle(.secondary)
+                Text("要扫描邮件、信息、废纸篓等受保护的位置，需要为 DiskLens 打开“完全磁盘访问权限”。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button("开启…") { access.showGuide = true }
+                    .buttonStyle(.link)
+                    .font(.callout)
+            }
         }
-    }
-}
-
-func openFullDiskAccessSettings() {
-    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-        NSWorkspace.shared.open(url)
     }
 }
 
@@ -353,17 +369,27 @@ private struct VolumeBar: View {
 }
 
 private struct UnreadableBanner: View {
+    @Environment(AccessModel.self) private var access
+    @Environment(AppModel.self) private var model
     let count: Int
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
-            Text("有 \(count) 个文件夹因为没有权限没能读取，结果可能偏小。")
+            Image(systemName: access.isGranted ? "arrow.clockwise.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(access.isGranted ? Color.accentColor : Color.yellow)
+            Text(access.isGranted
+                 ? "已获得完全磁盘访问权限。完整扫描一次，就能包括之前读不到的 \(count) 个文件夹。"
+                 : "有 \(count) 个文件夹因为没有权限没能读取，结果可能偏小。")
                 .font(.callout)
             Spacer()
-            Button("打开完全磁盘访问权限设置") { openFullDiskAccessSettings() }
-                .font(.callout)
+            if access.isGranted {
+                Button("完整重新扫描") { model.fullRescan() }
+                    .font(.callout)
+                    .disabled(model.isBusy)
+            } else {
+                Button("开启完全磁盘访问权限…") { access.showGuide = true }
+                    .font(.callout)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

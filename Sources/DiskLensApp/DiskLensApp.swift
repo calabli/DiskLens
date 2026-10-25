@@ -7,6 +7,7 @@ struct DiskLensApp: App {
     @State private var model = AppModel()
     @State private var recording = BackgroundRecording()
     @State private var monitor = SpaceMonitor()
+    @State private var access = AccessModel()
     @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
 
     init() {
@@ -19,6 +20,7 @@ struct DiskLensApp: App {
                 .environment(model)
                 .environment(recording)
                 .environment(monitor)
+                .environment(access)
                 .frame(minWidth: 960, minHeight: 600)
                 .task { monitor.start() }
                 .task {
@@ -70,6 +72,7 @@ struct DiskLensApp: App {
 
         Settings {
             SettingsView()
+                .environment(access)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

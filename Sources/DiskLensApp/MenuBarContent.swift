@@ -134,6 +134,7 @@ private struct UsageBar: View {
 
 /// DiskLens › Settings (⌘,).
 struct SettingsView: View {
+    @Environment(AccessModel.self) private var access
     @AppStorage(SpaceMonitor.Keys.menuBar) private var menuBar = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceAlerts) private var lowSpaceAlerts = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceThreshold) private var threshold = 20
@@ -141,6 +142,25 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("权限") {
+                LabeledContent("完全磁盘访问权限") {
+                    if access.isGranted {
+                        Label("已开启", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        HStack {
+                            Text("未开启").foregroundStyle(.secondary)
+                            Button("开启…") { access.openSettings() }
+                        }
+                    }
+                }
+                if let agent = access.agentStatus {
+                    LabeledContent("后台助手") {
+                        Text(agent == .granted ? "已开启" : "未开启，受保护文件夹的变化不会被记录")
+                            .foregroundStyle(agent == .granted ? Color.green : Color.secondary)
+                    }
+                }
+            }
+            .onAppear { access.refresh() }
             Section {
                 Toggle("在菜单栏显示可用空间", isOn: $menuBar)
                 Text("开启时，关掉主窗口后 DiskLens 继续留在菜单栏。")

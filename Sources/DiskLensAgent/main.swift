@@ -36,6 +36,7 @@ final class Agent: @unchecked Sendable {
             _ = sampler.sample()  // baseline
             tracker.start()
             recordVolume(minute: FolderGrowthTracker.minute())
+            reportAccess()
         }
         timers.append(repeating(every: 10) { [self] in
             for (app, bytes) in sampler.sample() { writes[app, default: 0] += bytes }
@@ -52,6 +53,7 @@ final class Agent: @unchecked Sendable {
             writes = [:]
             try store.addGrowth(tracker.takeChanges(), minute: minute)
             recordVolume(minute: minute)
+            if minute % 600 == 0 { reportAccess() }
             if Date().timeIntervalSince(lastPrune) > 86_400 {
                 try store.prune(before: Int64(Date().timeIntervalSince1970 - Self.retention))
                 lastPrune = Date()
@@ -73,6 +75,14 @@ final class Agent: @unchecked Sendable {
         source.resume()
         termination = source
     }
+
+    /// Tells the app whether the agent itself can read protected folders; macOS
+    /// may grant Full Disk Access to it separately from the app.
+    private func reportAccess() {
+        try? store.setMeta(Agent.accessKey, FullDiskAccess.status(home: home).rawValue)
+    }
+
+    static let accessKey = "agent.fullDiskAccess"
 
     private func recordVolume(minute: Int64) {
         let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]

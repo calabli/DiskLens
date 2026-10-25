@@ -15,6 +15,8 @@ open build/DiskLens.app
 
 The bundle is ad-hoc signed. macOS ties Full Disk Access to that signature, so after a rebuild the permission may need to be granted again.
 
+Without Full Disk Access, macOS keeps every app out of Mail, Messages, Safari, other apps' containers and the Trash. On first launch DiskLens opens a guide: it explains what is missing, opens the right Settings pane, offers its icon to drag into the list, and notices the permission by itself (`FullDiskAccess` probes files only readable with access). Folders that were unreadable never appear in the change journal, so after access is granted DiskLens offers one full rescan. The background agent reports its own access too, since macOS may treat it as a separate program.
+
 ## Command-line tool
 
 ```bash

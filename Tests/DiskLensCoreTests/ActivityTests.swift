@@ -112,3 +112,17 @@ private func temporaryStore() throws -> (ActivityStore, URL) {
     tracker.folderChanged([root + "/Downloads"])
     #expect(tracker.takeChanges().isEmpty)
 }
+
+@Test func storeKeepsTheLatestMetaValue() throws {
+    let (store, folder) = try temporaryStore()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    #expect(store.meta("x") == nil)
+    try store.setMeta("x", "denied")
+    try store.setMeta("x", "granted")
+    #expect(store.meta("x")?.value == "granted")
+}
+
+@Test func fullDiskAccessProbeGivesAnAnswerHere() {
+    // Test runners usually lack Full Disk Access; either way the probe must decide.
+    #expect(FullDiskAccess.status() != .unknown)
+}
