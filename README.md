@@ -29,7 +29,7 @@ Folders protected by macOS privacy controls are reported as unreadable unless th
 ## How the scan works
 
 - `DirectoryReader` reads a whole directory per `getattrlistbulk(2)` call and takes each entry's allocated size, the same measure `du` uses.
-- `DiskScanner` reads directories breadth-first on one thread per CPU core and stays on the starting volume by default. `snapshot()` returns the tree scanned so far, which the app uses to draw the treemap while the scan runs; node ids in a snapshot stay valid in later snapshots and the final tree.
+- `DiskScanner` reads the top three levels breadth-first and the rest depth-first, on 4× as many threads as CPU cores (at most 32), and stays on the starting volume by default. A large scan is limited by small random metadata reads from the SSD, so it gains from many reads in flight. Each subfolder is opened with `openat` relative to its open parent; opening by full path made every thread lock the same top folders. `snapshot()` returns the tree scanned so far, which the app uses to draw the treemap while the scan runs; node ids in a snapshot stay valid in later snapshots and the final tree.
 - Hard links are counted once, by inode. Symlinks are not followed.
 - Names live in a `NamePool` of packed UTF-8 bytes, and the per-entry data in `ChunkedArray`s: fixed-size chunks that never move, so a snapshot shares them instead of copying.
 - `FileTree` stores the result as flat parallel arrays and rolls sizes up in one pass. Children are sorted largest first. `remove(_:)` takes trashed items out and keeps that order.

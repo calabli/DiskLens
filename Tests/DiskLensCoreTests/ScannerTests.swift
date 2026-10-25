@@ -158,3 +158,22 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
         #expect(Int(tree.parents[node]) < node)
     }
 }
+
+@Test func openingByPathAndByParentGiveTheSameTree() throws {
+    let box = try Sandbox()
+    for i in 0..<60 {
+        try box.write("a\(i % 5)/b\(i % 4)/c\(i % 3)/d/f\(i).bin", bytes: 500 * (i + 1))
+    }
+    var byPath = ScanOptions()
+    byPath.openFolderLimit = 0
+    var byParent = ScanOptions()
+    byParent.openFolderLimit = 10_000
+
+    let a = try DiskScanner(options: byPath).scan(box.root)
+    let b = try DiskScanner(options: byParent).scan(box.root)
+
+    #expect(a.totalSize == b.totalSize)
+    #expect(a.count == b.count)
+    #expect(a.stats.files == 60 && b.stats.files == 60)
+    #expect(a.stats.unreadableDirectories == 0 && b.stats.unreadableDirectories == 0)
+}

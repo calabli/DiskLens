@@ -14,8 +14,6 @@ struct RawEntry {
     var kind: EntryKind
     /// Bytes allocated on disk (sum of all forks for files, the directory's own blocks for directories).
     var allocSize: Int64
-    /// Logical file length; 0 for directories.
-    var logicalSize: Int64
     var fileID: UInt64
     var linkCount: UInt32
     var device: Int32
@@ -35,20 +33,19 @@ final class DirectoryReader {
         attrs.commonattr = bits(ATTR_CMN_RETURNED_ATTRS) | bits(ATTR_CMN_NAME) | bits(ATTR_CMN_ERROR)
             | bits(ATTR_CMN_DEVID) | bits(ATTR_CMN_OBJTYPE) | bits(ATTR_CMN_MODTIME) | bits(ATTR_CMN_FILEID)
         attrs.dirattr = bits(ATTR_DIR_ALLOCSIZE)
-        attrs.fileattr = bits(ATTR_FILE_LINKCOUNT) | bits(ATTR_FILE_TOTALSIZE) | bits(ATTR_FILE_ALLOCSIZE)
+        attrs.fileattr = bits(ATTR_FILE_LINKCOUNT) | bits(ATTR_FILE_ALLOCSIZE)
     }
 
     deinit {
         buffer.deallocate()
     }
 
-    /// Appends the entries of the directory at `path` to `entries`, and their
-    /// names to `names`. Returns 0 on success or the `errno` that stopped the read.
-    func read(path: String, into entries: inout [RawEntry], names: inout [UInt8]) -> Int32 {
-        let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-        if fd < 0 { return errno }
-        defer { close(fd) }
+    static let openFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
 
+    /// Appends the entries of the open directory `fd` to `entries`, and their
+    /// names to `names`. Returns 0 on success or the `errno` that stopped the read.
+    /// The caller opens and closes `fd`.
+    func read(directory fd: Int32, into entries: inout [RawEntry], names: inout [UInt8]) -> Int32 {
         while true {
             let count = getattrlistbulk(fd, &attrs, buffer.baseAddress, buffer.count, 0)
             if count < 0 { return errno }
@@ -79,7 +76,7 @@ final class DirectoryReader {
             if error != 0 { return nil }
         }
 
-        var entry = RawEntry(name: names.count..<names.count, kind: .other, allocSize: 0, logicalSize: 0,
+        var entry = RawEntry(name: names.count..<names.count, kind: .other, allocSize: 0,
                              fileID: 0, linkCount: 1, device: 0, modTime: 0)
 
         if returned.commonattr & bits(ATTR_CMN_NAME) != 0 {
@@ -123,10 +120,6 @@ final class DirectoryReader {
         if returned.fileattr & bits(ATTR_FILE_LINKCOUNT) != 0 {
             entry.linkCount = field.loadUnaligned(as: UInt32.self)
             field += MemoryLayout<UInt32>.size
-        }
-        if returned.fileattr & bits(ATTR_FILE_TOTALSIZE) != 0 {
-            entry.logicalSize = field.loadUnaligned(as: off_t.self)
-            field += MemoryLayout<off_t>.size
         }
         if returned.fileattr & bits(ATTR_FILE_ALLOCSIZE) != 0 {
             entry.allocSize = field.loadUnaligned(as: off_t.self)
