@@ -12,6 +12,8 @@ APP=build/DiskLens.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/DiskLensApp" "$APP/Contents/MacOS/DiskLens"
+# Resources of the core library, such as the cleanup rules (found through Bundle.module).
+cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

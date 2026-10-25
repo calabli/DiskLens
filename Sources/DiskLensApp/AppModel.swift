@@ -73,6 +73,19 @@ final class AppModel {
     var previewURL: URL?
     var alertMessage: String?
 
+    enum Section: Hashable {
+        case overview
+        case cleanup
+    }
+
+    var section: Section = .overview
+    private(set) var suggestions: [CleanupSuggestion] = []
+    private(set) var isAnalyzing = false
+    private(set) var runningAppIDs: Set<String> = []
+    @ObservationIgnored private var installedApps: InstalledApps?
+    @ObservationIgnored private var appNames: [String: String] = [:]
+    static let rules = Result { try CleanupRuleSet.bundled().rules }
+
     private var scanner: DiskScanner?
     private var snapshotTask: Task<Void, Never>?
     private var scanGeneration = 0
@@ -91,6 +104,7 @@ final class AppModel {
         selection = nil
         basket = []
         rows = []
+        suggestions = []
         volume = VolumeInfo(path: path)
 
         let scanner = DiskScanner { [weak self] files in
@@ -175,6 +189,7 @@ final class AppModel {
             treeVersion += 1
             phase = .ready
             refreshRows()
+            refreshSuggestions()
             // The snapshots are gone; hand their freed pages back to the system now
             // instead of whenever memory gets tight.
             Task.detached(priority: .background) {
@@ -287,6 +302,53 @@ final class AppModel {
         .sorted(using: sortOrder)
     }
 
+    // MARK: Cleanup suggestions
+
+    /// Re-runs the advisor on the current tree, e.g. after a scan or after trashing.
+    func refreshSuggestions() {
+        guard let tree, !isScanning else { return }
+        let version = treeVersion
+        isAnalyzing = true
+        Task {
+            let rules = (try? Self.rules.get()) ?? []
+            let installed: InstalledApps
+            if let installedApps {
+                installed = installedApps
+            } else {
+                installed = await Task.detached(priority: .userInitiated) { InstalledApps.discover() }.value
+                installedApps = installed
+            }
+            let result = await Task.detached(priority: .userInitiated) {
+                CleanupAdvisor { installed.isInstalled($0) }.suggestions(for: tree, rules: rules)
+            }.value
+            guard version == treeVersion else { return }
+            suggestions = result
+            isAnalyzing = false
+        }
+    }
+
+    func refreshRunningApps() {
+        runningAppIDs = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier?.lowercased() })
+    }
+
+    /// The owning apps of `suggestion` that are open right now.
+    func runningApps(for suggestion: CleanupSuggestion) -> [String] {
+        suggestion.apps.filter { runningAppIDs.contains($0.lowercased()) }
+    }
+
+    func appName(_ bundleID: String) -> String {
+        if let name = appNames[bundleID] { return name }
+        let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") }
+            ?? bundleID
+        appNames[bundleID] = name
+        return name
+    }
+
+    func addToBasket(_ items: [CleanupItem]) {
+        items.forEach { addToBasket($0.node) }
+    }
+
     // MARK: Basket
 
     var basketTotal: Int64 {
@@ -338,6 +400,7 @@ final class AppModel {
         }
         if let selection, tree.isRemoved(selection) { self.selection = nil }
         refreshRows()
+        refreshSuggestions()
         if let path = lastScanPath { volume = VolumeInfo(path: path) }
 
         if !failures.isEmpty {

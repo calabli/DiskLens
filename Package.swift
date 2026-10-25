@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "DiskLensApp", targets: ["DiskLensApp"]),
     ],
     targets: [
-        .target(name: "DiskLensCore"),
+        .target(name: "DiskLensCore", resources: [.process("Resources")]),
         .executableTarget(name: "disklens", dependencies: ["DiskLensCore"]),
         .executableTarget(name: "DiskLensApp", dependencies: ["DiskLensCore"]),
         .testTarget(name: "DiskLensCoreTests", dependencies: ["DiskLensCore"]),

@@ -1,0 +1,554 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "xcode.derived-data",
+      "title": "Xcode 编译缓存（DerivedData）",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Xcode 编译时生成的中间文件和索引。",
+      "consequence": "下次打开项目时重新编译和建索引，第一次会慢一些。",
+      "paths": ["~/Library/Developer/Xcode/DerivedData/*"],
+      "apps": ["com.apple.dt.Xcode"]
+    },
+    {
+      "id": "xcode.device-support",
+      "title": "旧设备的调试符号（DeviceSupport）",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "每连接一个新系统版本的设备，Xcode 就会下载一份调试符号，旧版本会一直留着。",
+      "consequence": "再连接对应版本的设备时会重新下载。",
+      "paths": [
+        "~/Library/Developer/Xcode/iOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/watchOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/tvOS DeviceSupport/*",
+        "~/Library/Developer/Xcode/visionOS DeviceSupport/*"
+      ],
+      "apps": ["com.apple.dt.Xcode"]
+    },
+    {
+      "id": "xcode.previews",
+      "title": "SwiftUI 预览缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Xcode 为 SwiftUI 预览构建的专用模拟环境。",
+      "consequence": "下次打开预览时重新生成。",
+      "paths": ["~/Library/Developer/Xcode/UserData/Previews"],
+      "apps": ["com.apple.dt.Xcode"]
+    },
+    {
+      "id": "xcode.archives",
+      "title": "Xcode 归档（Archives）",
+      "category": "developer",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "每次 Product › Archive 生成的发布包，里面有符号化崩溃日志所需的 dSYM。",
+      "consequence": "已发布版本的崩溃日志将无法符号化，建议只删除不再维护的旧版本。",
+      "paths": ["~/Library/Developer/Xcode/Archives/*/*"]
+    },
+    {
+      "id": "simulator.caches",
+      "title": "模拟器缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "iOS 模拟器的动态库缓存。",
+      "consequence": "下次启动模拟器时重新生成，第一次会慢一些。",
+      "paths": ["~/Library/Developer/CoreSimulator/Caches"],
+      "apps": ["com.apple.iphonesimulator"]
+    },
+    {
+      "id": "simulator.devices",
+      "title": "模拟器设备",
+      "category": "developer",
+      "safety": "info",
+      "regenerable": false,
+      "explanation": "每台模拟器的系统和装在里面的 App。直接删文件夹会让 Xcode 的设备列表出错。",
+      "consequence": "用命令删除已不可用的模拟器（对应的系统版本已卸载）。",
+      "paths": ["~/Library/Developer/CoreSimulator/Devices"],
+      "action": "command",
+      "command": "xcrun simctl delete unavailable"
+    },
+    {
+      "id": "swiftpm.cache",
+      "title": "Swift Package Manager 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "下载过的 Swift 包仓库。",
+      "consequence": "下次解析依赖时重新下载。",
+      "paths": ["~/Library/Caches/org.swift.swiftpm"]
+    },
+    {
+      "id": "cocoapods.cache",
+      "title": "CocoaPods 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "下载过的 Pod 源码和 Specs。",
+      "consequence": "下次 pod install 时重新下载。",
+      "paths": ["~/Library/Caches/CocoaPods"]
+    },
+    {
+      "id": "carthage.cache",
+      "title": "Carthage 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "下载过的 Carthage 依赖。",
+      "consequence": "下次构建依赖时重新下载。",
+      "paths": ["~/Library/Caches/org.carthage.CarthageKit"]
+    },
+    {
+      "id": "npm.cache",
+      "title": "npm 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "npm 下载过的包。",
+      "consequence": "下次安装依赖时重新下载。",
+      "paths": ["~/.npm/_cacache"]
+    },
+    {
+      "id": "yarn.cache",
+      "title": "Yarn 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Yarn 下载过的包。",
+      "consequence": "下次安装依赖时重新下载。",
+      "paths": ["~/Library/Caches/Yarn"]
+    },
+    {
+      "id": "pnpm.store",
+      "title": "pnpm 包仓库",
+      "category": "developer",
+      "safety": "info",
+      "regenerable": true,
+      "explanation": "pnpm 用硬链接把包共享给各个项目，直接删除并不能释放被项目引用的部分。",
+      "consequence": "用命令清掉没有任何项目引用的包。",
+      "paths": ["~/Library/pnpm/store"],
+      "action": "command",
+      "command": "pnpm store prune"
+    },
+    {
+      "id": "bun.cache",
+      "title": "Bun 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Bun 下载过的包。",
+      "consequence": "下次安装依赖时重新下载。",
+      "paths": ["~/.bun/install/cache"]
+    },
+    {
+      "id": "node-gyp.cache",
+      "title": "node-gyp 头文件缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "编译 Node 原生模块用的头文件。",
+      "consequence": "下次编译原生模块时重新下载。",
+      "paths": ["~/Library/Caches/node-gyp"]
+    },
+    {
+      "id": "pip.cache",
+      "title": "pip 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "pip 下载和编译过的 Python 包。",
+      "consequence": "下次安装时重新下载。",
+      "paths": ["~/Library/Caches/pip"]
+    },
+    {
+      "id": "uv.cache",
+      "title": "uv 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "uv 下载过的 Python 包和解释器。",
+      "consequence": "下次安装时重新下载。",
+      "paths": ["~/.cache/uv"]
+    },
+    {
+      "id": "conda.pkgs",
+      "title": "Conda 包缓存",
+      "category": "developer",
+      "safety": "info",
+      "regenerable": true,
+      "explanation": "Conda 下载过的安装包，环境里可能还在引用。",
+      "consequence": "用命令清理未使用的包和安装包。",
+      "paths": ["~/miniconda3/pkgs", "~/anaconda3/pkgs", "~/opt/anaconda3/pkgs", "~/miniforge3/pkgs"],
+      "action": "command",
+      "command": "conda clean --all"
+    },
+    {
+      "id": "homebrew.cache",
+      "title": "Homebrew 下载缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Homebrew 下载过的安装包。",
+      "consequence": "重新安装或升级时重新下载。",
+      "paths": ["~/Library/Caches/Homebrew"]
+    },
+    {
+      "id": "go.build-cache",
+      "title": "Go 编译缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "go build 和 go test 的编译结果缓存。",
+      "consequence": "下次编译会慢一些。",
+      "paths": ["~/Library/Caches/go-build"]
+    },
+    {
+      "id": "go.mod-cache",
+      "title": "Go 模块缓存",
+      "category": "developer",
+      "safety": "info",
+      "regenerable": true,
+      "explanation": "下载过的 Go 模块。文件是只读的，直接删除会遇到权限问题。",
+      "consequence": "用命令清除，之后编译时重新下载。",
+      "paths": ["~/go/pkg/mod"],
+      "action": "command",
+      "command": "go clean -modcache"
+    },
+    {
+      "id": "gradle.cache",
+      "title": "Gradle 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Gradle 下载的依赖、构建缓存和旧版本的 Gradle 发行包。",
+      "consequence": "下次构建时重新下载，第一次会比较慢。",
+      "paths": ["~/.gradle/caches", "~/.gradle/wrapper/dists"]
+    },
+    {
+      "id": "maven.repository",
+      "title": "Maven 本地仓库",
+      "category": "developer",
+      "safety": "review",
+      "regenerable": true,
+      "explanation": "Maven 下载的所有依赖，也可能有你自己 install 进去的包。",
+      "consequence": "下次构建时重新下载；自己 install 的包需要重新 install。",
+      "paths": ["~/.m2/repository"]
+    },
+    {
+      "id": "cargo.registry",
+      "title": "Cargo 包缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Rust crates 的下载包和解压后的源码。",
+      "consequence": "下次构建时重新下载。",
+      "paths": ["~/.cargo/registry/cache", "~/.cargo/registry/src"]
+    },
+    {
+      "id": "jetbrains.caches",
+      "title": "JetBrains IDE 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "IntelliJ IDEA、PyCharm、GoLand 等的索引和缓存，包括已卸载旧版本留下的。",
+      "consequence": "下次打开项目时重建索引。",
+      "paths": ["~/Library/Caches/JetBrains/*"],
+      "apps": ["com.jetbrains.intellij", "com.jetbrains.pycharm", "com.jetbrains.goland", "com.jetbrains.WebStorm", "com.jetbrains.CLion", "com.jetbrains.rider", "com.google.android.studio"]
+    },
+    {
+      "id": "vscode.caches",
+      "title": "VS Code 缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "VS Code 的界面缓存和扩展安装包缓存。",
+      "consequence": "下次启动时重新生成。",
+      "paths": [
+        "~/Library/Application Support/Code/Cache",
+        "~/Library/Application Support/Code/CachedData",
+        "~/Library/Application Support/Code/CachedExtensionVSIXs",
+        "~/Library/Application Support/Code/Service Worker/CacheStorage"
+      ],
+      "apps": ["com.microsoft.VSCode"]
+    },
+    {
+      "id": "playwright.browsers",
+      "title": "Playwright / Puppeteer 浏览器",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "自动化测试下载的浏览器内核。",
+      "consequence": "下次运行测试时重新下载（或执行 npx playwright install）。",
+      "paths": ["~/Library/Caches/ms-playwright", "~/.cache/puppeteer"]
+    },
+    {
+      "id": "electron.cache",
+      "title": "Electron 下载缓存",
+      "category": "developer",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "构建 Electron 应用时下载的运行时。",
+      "consequence": "下次构建时重新下载。",
+      "paths": ["~/Library/Caches/electron", "~/Library/Caches/electron-builder"]
+    },
+    {
+      "id": "android.system-images",
+      "title": "Android 模拟器系统镜像",
+      "category": "developer",
+      "safety": "review",
+      "regenerable": true,
+      "explanation": "Android SDK 下载的模拟器系统镜像，每个几 GB。",
+      "consequence": "用到对应版本的模拟器时需要在 SDK Manager 里重新下载。",
+      "paths": ["~/Library/Android/sdk/system-images/*/*"]
+    },
+    {
+      "id": "docker.disk",
+      "title": "Docker 虚拟磁盘",
+      "category": "developer",
+      "safety": "info",
+      "regenerable": false,
+      "explanation": "所有镜像、容器和卷都在这个文件里，删除它等于清空 Docker。",
+      "consequence": "用命令清理不再使用的镜像和容器，再在 Docker 设置里回收磁盘空间。",
+      "paths": ["~/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"],
+      "action": "command",
+      "command": "docker system prune"
+    },
+    {
+      "id": "system.logs",
+      "title": "应用日志",
+      "category": "system",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "各个应用写下的运行日志和崩溃报告。",
+      "consequence": "排查旧问题时会少一些线索，应用会继续写新的日志。",
+      "paths": ["~/Library/Logs/*"]
+    },
+    {
+      "id": "system.trash",
+      "title": "废纸篓",
+      "category": "system",
+      "safety": "info",
+      "regenerable": false,
+      "explanation": "移到废纸篓的文件仍然占用空间。",
+      "consequence": "在 Finder 中清倒废纸篓后才会真正释放。",
+      "paths": ["~/.Trash"],
+      "action": "none",
+      "minimumSize": 1000000
+    },
+    {
+      "id": "downloads.installers",
+      "title": "下载文件夹里的安装包",
+      "category": "system",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "装完应用后通常就用不到的 .dmg、.pkg 和 .xip。",
+      "consequence": "需要重装时要重新下载。",
+      "paths": ["~/Downloads/*.dmg", "~/Downloads/*.pkg", "~/Downloads/*.xip", "~/Downloads/*.iso"],
+      "minimumSize": 1000000
+    },
+    {
+      "id": "wallpaper.aerials",
+      "title": "动态壁纸视频",
+      "category": "system",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "系统下载的航拍动态壁纸和屏幕保护视频。",
+      "consequence": "再次选用这些壁纸时会重新下载。",
+      "paths": ["~/Library/Application Support/com.apple.wallpaper/aerials/videos"]
+    },
+    {
+      "id": "ios.backups",
+      "title": "iPhone / iPad 备份",
+      "category": "backups",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "在 Finder 中备份的设备数据，每份往往有几十 GB。",
+      "consequence": "删除后无法从这份备份恢复设备，建议只删已不再使用的设备的旧备份。",
+      "paths": ["~/Library/Application Support/MobileSync/Backup/*"]
+    },
+    {
+      "id": "ios.software-updates",
+      "title": "iPhone / iPad 系统更新包",
+      "category": "backups",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "通过 Mac 给设备升级时下载的 .ipsw 固件。",
+      "consequence": "下次通过 Mac 升级时重新下载。",
+      "paths": ["~/Library/iTunes/iPhone Software Updates", "~/Library/iTunes/iPad Software Updates"]
+    },
+    {
+      "id": "mail.downloads",
+      "title": "邮件附件下载",
+      "category": "apps",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "在“邮件”里打开过的附件副本，原附件仍在邮件中。",
+      "consequence": "再次打开附件时会重新生成。",
+      "paths": ["~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"],
+      "apps": ["com.apple.mail"]
+    },
+    {
+      "id": "messages.attachments",
+      "title": "“信息”附件",
+      "category": "apps",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "iMessage 中收发的照片、视频和文件。",
+      "consequence": "对话里的这些附件将无法打开；开启了“iCloud 中的信息”时可在设置里改为自动删除旧信息。",
+      "paths": ["~/Library/Messages/Attachments"],
+      "apps": ["com.apple.MobileSMS"]
+    },
+    {
+      "id": "browser.caches",
+      "title": "浏览器缓存",
+      "category": "apps",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "Chrome、Edge、Firefox、Arc 缓存的网页资源。",
+      "consequence": "网页第一次打开会慢一些，登录状态和书签不受影响。",
+      "paths": [
+        "~/Library/Caches/Google/Chrome",
+        "~/Library/Caches/Microsoft Edge",
+        "~/Library/Caches/Firefox/Profiles",
+        "~/Library/Caches/Arc",
+        "~/Library/Caches/BraveSoftware"
+      ],
+      "apps": ["com.google.Chrome", "com.microsoft.edgemac", "org.mozilla.firefox", "company.thebrowser.Browser", "com.brave.Browser"]
+    },
+    {
+      "id": "electron-apps.caches",
+      "title": "Slack、Discord 等应用缓存",
+      "category": "apps",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "基于 Electron 的桌面应用缓存的图片和网页资源。",
+      "consequence": "应用第一次打开时会重新加载这些内容。",
+      "paths": [
+        "~/Library/Application Support/Slack/Cache",
+        "~/Library/Application Support/Slack/Service Worker/CacheStorage",
+        "~/Library/Application Support/discord/Cache",
+        "~/Library/Application Support/Notion/Partitions/notion/Cache",
+        "~/Library/Containers/com.microsoft.teams2/Data/Library/Caches"
+      ],
+      "apps": ["com.tinyspeck.slackmacgap", "com.hnc.Discord", "notion.id", "com.microsoft.teams2"]
+    },
+    {
+      "id": "spotify.cache",
+      "title": "Spotify 缓存",
+      "category": "apps",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "播放时缓存的音乐数据，不包括下载到离线的歌曲。",
+      "consequence": "听过的歌再次播放时重新缓冲。",
+      "paths": ["~/Library/Caches/com.spotify.client"],
+      "apps": ["com.spotify.client"]
+    },
+    {
+      "id": "wechat.files",
+      "title": "微信聊天文件和视频",
+      "category": "chat",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "聊天中收发的文件、视频和图片，常年累积会占很大空间。",
+      "consequence": "删除后在聊天里打开会提示文件已过期；需要保留的请先另存。",
+      "paths": [
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat/*/*/Message/MessageTemp",
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/*/msg/file",
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/*/msg/video",
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/*/msg/attach"
+      ],
+      "apps": ["com.tencent.xinWeChat"]
+    },
+    {
+      "id": "wechat.cache",
+      "title": "微信缓存",
+      "category": "chat",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "微信缓存的头像、表情和小程序资源。",
+      "consequence": "微信会按需重新下载。",
+      "paths": [
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Library/Caches",
+        "~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/*/cache"
+      ],
+      "apps": ["com.tencent.xinWeChat"]
+    },
+    {
+      "id": "qq.files",
+      "title": "QQ 聊天图片、视频和文件",
+      "category": "chat",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "QQ 聊天中收发的图片、视频和文件。",
+      "consequence": "删除后在聊天里将无法查看这些内容；需要保留的请先另存。",
+      "paths": [
+        "~/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_*/nt_data/Pic",
+        "~/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_*/nt_data/Video",
+        "~/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/nt_qq_*/nt_data/File"
+      ],
+      "apps": ["com.tencent.qq"]
+    },
+    {
+      "id": "qq.cache",
+      "title": "QQ 缓存",
+      "category": "chat",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "QQ 缓存的头像、表情和网页资源。",
+      "consequence": "QQ 会按需重新下载。",
+      "paths": ["~/Library/Containers/com.tencent.qq/Data/Library/Caches"],
+      "apps": ["com.tencent.qq"]
+    },
+    {
+      "id": "wecom.files",
+      "title": "企业微信聊天文件",
+      "category": "chat",
+      "safety": "review",
+      "regenerable": false,
+      "explanation": "企业微信聊天中收发的文件、图片和视频。",
+      "consequence": "删除后在聊天里需要重新下载，过期的文件将无法打开。",
+      "paths": ["~/Library/Containers/com.tencent.WeWorkMac/Data/Documents/Profiles/*/Caches"],
+      "apps": ["com.tencent.WeWorkMac"]
+    },
+    {
+      "id": "wecom.cache",
+      "title": "企业微信缓存",
+      "category": "chat",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "企业微信缓存的网页和图片资源。",
+      "consequence": "企业微信会按需重新下载。",
+      "paths": ["~/Library/Containers/com.tencent.WeWorkMac/Data/Library/Caches"],
+      "apps": ["com.tencent.WeWorkMac"]
+    },
+    {
+      "id": "feishu.cache",
+      "title": "飞书缓存",
+      "category": "chat",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "飞书缓存的网页、图片和小程序资源。",
+      "consequence": "飞书会按需重新下载。",
+      "paths": [
+        "~/Library/Containers/com.bytedance.macos.feishu/Data/Library/Caches",
+        "~/Library/Caches/LarkShell"
+      ],
+      "apps": ["com.bytedance.macos.feishu", "com.electron.lark"]
+    },
+    {
+      "id": "dingtalk.cache",
+      "title": "钉钉缓存",
+      "category": "chat",
+      "safety": "safe",
+      "regenerable": true,
+      "explanation": "钉钉缓存的图片和网页资源。",
+      "consequence": "钉钉会按需重新下载。",
+      "paths": ["~/Library/Containers/com.alibaba.DingTalkMac/Data/Library/Caches"],
+      "apps": ["com.alibaba.DingTalkMac"]
+    }
+  ]
+}

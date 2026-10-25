@@ -2,19 +2,21 @@ import DiskLensCore
 import Foundation
 
 let usage = """
-    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb]
+    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest]
 
       --top N        largest N children to list per level (default 15)
       --depth D      how many levels to expand (default 1)
       --threads N    worker threads (default: number of CPU cores)
       --all-volumes  descend into other mounted volumes
       --kb           print only the total in 1024-byte blocks, like `du -sk`
+      --suggest      print cleanup suggestions instead of the largest items
     """
 
 var path: String?
 var top = 15
 var depth = 1
 var kbOnly = false
+var suggest = false
 var options = ScanOptions()
 
 var args = CommandLine.arguments.dropFirst().makeIterator()
@@ -32,6 +34,7 @@ while let arg = args.next() {
     case "--threads": options.threadCount = intArg(arg)
     case "--all-volumes": options.stayOnVolume = false
     case "--kb": kbOnly = true
+    case "--suggest": suggest = true
     case "-h", "--help":
         print(usage)
         exit(0)
@@ -59,6 +62,25 @@ do {
 
 if kbOnly {
     print(tree.totalSize / 1024)
+    exit(0)
+}
+
+if suggest {
+    let installed = InstalledApps.discover()
+    let advisor = CleanupAdvisor { installed.isInstalled($0) }
+    let rules = (try? CleanupRuleSet.bundled().rules) ?? []
+    let started = Date()
+    let suggestions = advisor.suggestions(for: tree, rules: rules)
+    print("\(suggestions.count) suggestions in \(String(format: "%.2f", Date().timeIntervalSince(started))) s\n")
+    for suggestion in suggestions {
+        let action = suggestion.command.map { "  $ \($0)" } ?? ""
+        print("[\(suggestion.safety.rawValue)] \(ByteFormat.string(suggestion.totalSize).padding(toLength: 9, withPad: " ", startingAt: 0)) \(suggestion.title)\(action)")
+        for item in suggestion.items.prefix(top) {
+            let date = item.lastModified.map { "  (last change \($0.formatted(date: .numeric, time: .omitted)))" } ?? ""
+            print("      \(ByteFormat.string(item.size).padding(toLength: 9, withPad: " ", startingAt: 0)) \(item.label)\(date)")
+        }
+        if suggestion.items.count > top { print("      … \(suggestion.items.count - top) more") }
+    }
     exit(0)
 }
 

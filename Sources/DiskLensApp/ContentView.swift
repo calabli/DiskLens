@@ -14,7 +14,7 @@ struct ContentView: View {
                 WelcomeView()
             case let .scanning(path, files):
                 if let tree = model.tree {
-                    BrowserView(tree: tree)
+                    MainSplitView(tree: tree)
                 } else {
                     ScanningView(path: path, files: files)
                 }
@@ -28,7 +28,7 @@ struct ContentView: View {
                 }
             case .ready:
                 if let tree = model.tree {
-                    BrowserView(tree: tree)
+                    MainSplitView(tree: tree)
                 }
             }
         }
@@ -180,9 +180,45 @@ struct BrowserView: View {
                 TreemapPane()
                     .frame(minWidth: 380)
             }
-            Divider()
-            BasketBar()
         }
+    }
+}
+
+/// The browsing window once there is something to show: a sidebar to switch
+/// between the space overview and the cleanup suggestions, and the basket below both.
+struct MainSplitView: View {
+    @Environment(AppModel.self) private var model
+    let tree: FileTree
+
+    var body: some View {
+        @Bindable var model = model
+        NavigationSplitView {
+            List(selection: $model.section) {
+                Label("概览", systemImage: "square.grid.2x2")
+                    .tag(AppModel.Section.overview)
+                Label("清理建议", systemImage: "sparkles")
+                    .badge(cleanupBadge)
+                    .tag(AppModel.Section.cleanup)
+            }
+            .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
+        } detail: {
+            VStack(spacing: 0) {
+                switch model.section {
+                case .overview:
+                    BrowserView(tree: tree)
+                case .cleanup:
+                    SuggestionsView()
+                }
+                Divider()
+                BasketBar()
+            }
+        }
+    }
+
+    private var cleanupBadge: Text? {
+        let total = model.suggestions.filter { $0.action == .trash && $0.safety != .info }
+            .reduce(Int64(0)) { $0 + $1.totalSize }
+        return total > 0 ? Text(ByteFormat.string(total)) : nil
     }
 }
 
