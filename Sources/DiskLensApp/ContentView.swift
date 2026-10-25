@@ -220,9 +220,7 @@ struct MainSplitView: View {
                 Label("大文件", systemImage: "doc.text.magnifyingglass")
                     .tag(AppModel.Section.largeFiles)
                 Label("重复文件", systemImage: "doc.on.doc")
-                    .badge(model.duplicatesAreStale ? nil : model.duplicateGroups.map { groups in
-                        Text(ByteFormat.string(groups.filter { !$0.isMostlyClones }.reduce(0) { $0 + $1.reclaimable }))
-                    })
+                    .badge(duplicatesBadge)
                     .tag(AppModel.Section.duplicates)
                 Label("变化", systemImage: "clock.arrow.circlepath")
                     .badge(model.comparison.flatMap { abs($0.delta) >= 1_000_000 ? Text($0.delta.signedBytes) : nil })
@@ -255,6 +253,18 @@ struct MainSplitView: View {
                 BasketBar()
             }
         }
+    }
+
+    @AppStorage("duplicates.minimumSize") private var duplicatesMinimumSize = 1_000_000
+    @AppStorage("duplicates.includeLibrary") private var duplicatesIncludeLibrary = false
+
+    private var duplicatesBadge: Text? {
+        guard let groups = model.duplicateGroups, !model.duplicatesAreStale else { return nil }
+        let reclaimable = DuplicatesView.narrowed(groups, in: tree, minimumSize: Int64(duplicatesMinimumSize),
+                                                  includeLibrary: duplicatesIncludeLibrary)
+            .filter { !$0.isMostlyClones }
+            .reduce(Int64(0)) { $0 + $1.reclaimable }
+        return Text(ByteFormat.string(reclaimable))
     }
 
     private var cleanupBadge: Text? {

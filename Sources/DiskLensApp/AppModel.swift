@@ -546,6 +546,8 @@ final class AppModel {
     private(set) var isFindingDuplicates = false
     /// The tree generation the duplicate groups' node ids belong to.
     private(set) var duplicatesGeneration = -1
+    /// The conditions the groups were found with; results can be narrowed below them, not widened.
+    private(set) var duplicatesSearch: (minimumSize: Int64, includeLibrary: Bool)?
     @ObservationIgnored private var duplicateFinder: DuplicateFinder?
 
     var duplicatesAreStale: Bool { duplicateGroups != nil && duplicatesGeneration != treeGeneration }
@@ -577,6 +579,7 @@ final class AppModel {
             if case let .success(groups) = result {
                 duplicateGroups = groups
                 duplicatesGeneration = generation
+                duplicatesSearch = (minimumSize, includeLibrary)
             }
         }
     }
