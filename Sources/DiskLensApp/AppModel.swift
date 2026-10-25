@@ -68,8 +68,11 @@ final class AppModel {
     private(set) var rows: [FolderRow] = []
     private(set) var basket: [Int] = []
     private(set) var volume: VolumeInfo?
-    /// Bumped whenever the tree changes in place, so views redo their layout.
+    /// Bumped whenever the tree changes, so views redo their layout.
     private(set) var treeVersion = 0
+    /// Bumped when a different tree replaces the current one, which renumbers
+    /// nodes; trashing items changes the tree in place and keeps node ids.
+    private(set) var treeGeneration = 0
     var previewURL: URL?
     var alertMessage: String?
 
@@ -79,6 +82,8 @@ final class AppModel {
         case largeFiles
         case changes
         case timeline
+        case duplicates
+        case storage
     }
 
     var section: Section = .overview
@@ -140,6 +145,7 @@ final class AppModel {
             }
             tree = saved.tree
             treeVersion += 1
+            treeGeneration += 1
             current = 0
             phase = .ready
             showingSavedScanFrom = saved.scannedAt
@@ -182,6 +188,7 @@ final class AppModel {
         largeFiles = []
         lastUsed = [:]
         comparison = nil
+        duplicateGroups = nil
         baseScan = nil
         showingSavedScanFrom = nil
         isUpdating = false
@@ -239,6 +246,7 @@ final class AppModel {
         let basketPaths = basket.compactMap { node in old.map { $0.path(of: node) } }
         tree = newTree
         treeVersion += 1
+        treeGeneration += 1
         current = currentPath.flatMap(newTree.node(atPath:)) ?? 0
         selection = selectionPath.flatMap(newTree.node(atPath:))
         basket = basketPaths.compactMap(newTree.node(atPath:))
@@ -281,6 +289,7 @@ final class AppModel {
             guard !Task.isCancelled, generation == scanGeneration, isScanning, let snapshot else { return }
             tree = snapshot
             treeVersion += 1
+            treeGeneration += 1
             refreshRows()
             let cost = ContinuousClock.now - started
             try? await Task.sleep(for: max(.milliseconds(600), cost * 3))
@@ -331,6 +340,7 @@ final class AppModel {
             // viewed and the selection carry over.
             self.tree = tree
             treeVersion += 1
+            treeGeneration += 1
             phase = .ready
             refreshRows()
             refreshSuggestions()
@@ -527,6 +537,54 @@ final class AppModel {
 
     func addToBasket(_ items: [CleanupItem]) {
         items.forEach { addToBasket($0.node) }
+    }
+
+    // MARK: Duplicates
+
+    private(set) var duplicateGroups: [DuplicateGroup]?
+    private(set) var duplicateProgress: DuplicateProgress?
+    private(set) var isFindingDuplicates = false
+    /// The tree generation the duplicate groups' node ids belong to.
+    private(set) var duplicatesGeneration = -1
+    @ObservationIgnored private var duplicateFinder: DuplicateFinder?
+
+    var duplicatesAreStale: Bool { duplicateGroups != nil && duplicatesGeneration != treeGeneration }
+
+    func findDuplicates(minimumSize: Int64, includeLibrary: Bool) {
+        guard let tree, !isBusy else { return }
+        duplicateFinder?.cancel()
+        let finder = DuplicateFinder()
+        finder.minimumSize = minimumSize
+        finder.includeLibrary = includeLibrary
+        duplicateFinder = finder
+        isFindingDuplicates = true
+        duplicateProgress = nil
+        let generation = treeGeneration
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    try finder.find(in: tree) { progress in
+                        Task { @MainActor in
+                            guard self.duplicateFinder === finder else { return }
+                            self.duplicateProgress = progress
+                        }
+                    }
+                }
+            }.value
+            guard duplicateFinder === finder else { return }
+            isFindingDuplicates = false
+            duplicateFinder = nil
+            if case let .success(groups) = result {
+                duplicateGroups = groups
+                duplicatesGeneration = generation
+            }
+        }
+    }
+
+    func cancelFindingDuplicates() {
+        duplicateFinder?.cancel()
+        duplicateFinder = nil
+        isFindingDuplicates = false
     }
 
     // MARK: Basket

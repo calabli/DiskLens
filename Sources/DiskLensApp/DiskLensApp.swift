@@ -6,13 +6,21 @@ struct DiskLensApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
     @State private var recording = BackgroundRecording()
+    @State private var monitor = SpaceMonitor()
+    @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
+
+    init() {
+        SpaceMonitor.registerDefaults()
+    }
 
     var body: some Scene {
         Window("DiskLens", id: "main") {
             ContentView()
                 .environment(model)
                 .environment(recording)
+                .environment(monitor)
                 .frame(minWidth: 960, minHeight: 600)
+                .task { monitor.start() }
                 .task {
                     // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes` opens
                     // that page, for development and scripting.
@@ -20,12 +28,18 @@ struct DiskLensApp: App {
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
                         model.scan((args[i + 1] as NSString).expandingTildeInPath)
                     }
+                    if args.contains("--find-duplicates") {
+                        while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
+                        model.findDuplicates(minimumSize: 1_000_000, includeLibrary: false)
+                    }
                     if let i = args.firstIndex(of: "--show"), i + 1 < args.count {
                         switch args[i + 1] {
                         case "cleanup": model.section = .cleanup
                         case "large-files": model.section = .largeFiles
                         case "changes": model.section = .changes
                         case "timeline": model.section = .timeline
+                        case "duplicates": model.section = .duplicates
+                        case "storage": model.section = .storage
                         default: break
                         }
                     }
@@ -39,6 +53,24 @@ struct DiskLensApp: App {
                 }
         }
         .defaultSize(width: 1240, height: 780)
+
+        // A read-only binding: the setting lives in Settings, and a two-way binding to
+        // @AppStorage made the status item and the scene update each other forever.
+        MenuBarExtra(isInserted: .constant(showsMenuBarItem)) {
+            MenuBarContent()
+                .environment(model)
+                .environment(monitor)
+        } label: {
+            // Kept to a plain title and symbol: the menu bar renders the label as an image,
+            // and a richer view (with tasks or environment lookups) re-renders endlessly.
+            // A Label shows only its icon in the menu bar; one Text carries both.
+            Text("\(Image(systemName: monitor.isLow ? "exclamationmark.triangle.fill" : "internaldrive")) \(monitor.menuBarTitle)")
+        }
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+        }
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("扫描主目录") { model.scan(AppModel.homePath) }
@@ -77,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        // With the menu bar item showing, closing the window leaves DiskLens there.
+        !UserDefaults.standard.bool(forKey: SpaceMonitor.Keys.menuBar)
     }
 }

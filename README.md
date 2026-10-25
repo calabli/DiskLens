@@ -57,6 +57,12 @@ Every finished scan is saved to `~/Library/Caches/app.disklens.DiskLens/Scans` (
 
 Records are kept for 90 days. The 空间时间线 page charts the daily or hourly change in used space, and for the whole range or a clicked bar it lists the sources of growth (expandable to folders) and the apps that wrote the most.
 
+## Duplicates, storage details and the menu bar
+
+- **Duplicates:** `DuplicateFinder` compares only files of equal size from the scan, first by exact length, then by a SHA-256 of their first and last 16 KB, then by a full SHA-256, reading with `F_NOCACHE`. It reads each file's private size (`ATTR_CMNEXT_PRIVATESIZE`), so APFS clones, which share their blocks, are not counted as reclaimable. Files in app bundles, dependency folders (`node_modules`…), hidden folders (`.git`…) and, unless asked, `~/Library` are left out: identical copies there belong to tools, and deleting one breaks its owner. On a home folder with 1.6M entries a search takes about half a second with a warm cache.
+- **Storage details:** `StorageBreakdown` reads the APFS container with `diskutil apfs list` and local snapshots with `tmutil`, so the page can show what a scan cannot: the system, Preboot/Recovery and VM volumes, purgeable space and snapshots.
+- **Menu bar:** free space (including purgeable space, as Finder counts it), today's change from the background agent's records, and shortcuts. DiskLens notifies when free space drops below a threshold or grows by 5 GB within an hour; both can be changed in Settings (⌘,).
+
 ## Cleanup suggestions
 
 `CleanupAdvisor` turns a scanned tree into suggestions in three tiers: safe to clean (caches and anything rebuilt automatically), review (probably unneeded, check each item), and info only (clean with a command, or not at all). It only ever suggests items inside the home folder, and it reads the tree in memory, so it takes well under a second.

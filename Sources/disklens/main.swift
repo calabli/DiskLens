@@ -2,7 +2,7 @@ import DiskLensCore
 import Foundation
 
 let usage = """
-    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest] [--use-cache]
+    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest] [--use-cache] [--duplicates]
 
       --top N        largest N children to list per level (default 15)
       --depth D      how many levels to expand (default 1)
@@ -10,6 +10,7 @@ let usage = """
       --all-volumes  descend into other mounted volumes
       --kb           print only the total in 1024-byte blocks, like `du -sk`
       --suggest      print cleanup suggestions instead of the largest items
+      --duplicates   list files with identical contents (1 MB and larger, outside ~/Library)
       --use-cache    update the saved scan from the change journal instead of rescanning,
                      then print what changed and save the new result
     """
@@ -20,6 +21,7 @@ var depth = 1
 var kbOnly = false
 var suggest = false
 var useCache = false
+var duplicates = false
 var options = ScanOptions()
 
 var args = CommandLine.arguments.dropFirst().makeIterator()
@@ -39,6 +41,7 @@ while let arg = args.next() {
     case "--kb": kbOnly = true
     case "--suggest": suggest = true
     case "--use-cache": useCache = true
+    case "--duplicates": duplicates = true
     case "-h", "--help":
         print(usage)
         exit(0)
@@ -102,6 +105,21 @@ do {
 
 if kbOnly {
     print(tree.totalSize / 1024)
+    exit(0)
+}
+
+if duplicates {
+    let started = Date()
+    let groups = try DuplicateFinder().find(in: tree)
+    let reclaimable = groups.reduce(Int64(0)) { $0 + $1.reclaimable }
+    print("\(groups.count) groups of duplicates, \(ByteFormat.string(reclaimable)) reclaimable, found in \(seconds(since: started))\n")
+    for group in groups.prefix(top) {
+        let clones = group.isMostlyClones ? "  (APFS clones, little to gain)" : ""
+        print("\(ByteFormat.string(group.reclaimable).padding(toLength: 9, withPad: " ", startingAt: 0)) \(group.files.count) × \(ByteFormat.string(group.size))\(clones)")
+        for file in group.files {
+            print("      \(file == group.files.first ? "keep" : "    ") \((file.path as NSString).abbreviatingWithTildeInPath)")
+        }
+    }
     exit(0)
 }
 

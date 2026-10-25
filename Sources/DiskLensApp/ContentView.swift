@@ -203,11 +203,18 @@ struct MainSplitView: View {
                     .tag(AppModel.Section.cleanup)
                 Label("大文件", systemImage: "doc.text.magnifyingglass")
                     .tag(AppModel.Section.largeFiles)
+                Label("重复文件", systemImage: "doc.on.doc")
+                    .badge(model.duplicatesAreStale ? nil : model.duplicateGroups.map { groups in
+                        Text(ByteFormat.string(groups.filter { !$0.isMostlyClones }.reduce(0) { $0 + $1.reclaimable }))
+                    })
+                    .tag(AppModel.Section.duplicates)
                 Label("变化", systemImage: "clock.arrow.circlepath")
-                    .badge(model.comparison.map { Text($0.delta.signedBytes) })
+                    .badge(model.comparison.flatMap { abs($0.delta) >= 1_000_000 ? Text($0.delta.signedBytes) : nil })
                     .tag(AppModel.Section.changes)
                 Label("空间时间线", systemImage: "chart.bar.xaxis")
                     .tag(AppModel.Section.timeline)
+                Label("存储详情", systemImage: "internaldrive")
+                    .tag(AppModel.Section.storage)
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
         } detail: {
@@ -223,6 +230,10 @@ struct MainSplitView: View {
                     ChangesView()
                 case .timeline:
                     TimelineView()
+                case .duplicates:
+                    DuplicatesView()
+                case .storage:
+                    StorageView()
                 }
                 Divider()
                 BasketBar()
