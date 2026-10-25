@@ -45,6 +45,10 @@ Folders protected by macOS privacy controls are reported as unreadable unless th
 
 `disklens ~ --suggest` prints the same suggestions in Terminal.
 
+## Large files
+
+`LargeFileFinder` lists the largest files in a scan. App bundles, photo libraries and disk-image bundles count as one item each; their contents are never listed, because deleting a file inside one breaks it. The app filters the list by size, type, name and time since last use, which comes from Spotlight's `kMDItemLastUsedDate` and falls back to the modification time.
+
 ## Tests
 
 ```bash

@@ -199,6 +199,8 @@ struct MainSplitView: View {
                 Label("清理建议", systemImage: "sparkles")
                     .badge(cleanupBadge)
                     .tag(AppModel.Section.cleanup)
+                Label("大文件", systemImage: "doc.text.magnifyingglass")
+                    .tag(AppModel.Section.largeFiles)
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
         } detail: {
@@ -208,6 +210,8 @@ struct MainSplitView: View {
                     BrowserView(tree: tree)
                 case .cleanup:
                     SuggestionsView()
+                case .largeFiles:
+                    LargeFilesView()
                 }
                 Divider()
                 BasketBar()

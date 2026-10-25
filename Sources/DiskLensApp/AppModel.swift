@@ -76,12 +76,16 @@ final class AppModel {
     enum Section: Hashable {
         case overview
         case cleanup
+        case largeFiles
     }
 
     var section: Section = .overview
     private(set) var suggestions: [CleanupSuggestion] = []
     private(set) var isAnalyzing = false
     private(set) var runningAppIDs: Set<String> = []
+    private(set) var largeFiles: [LargeFile] = []
+    /// When each large file was last opened, from Spotlight; filled in after the list.
+    private(set) var lastUsed: [Int: Date] = [:]
     @ObservationIgnored private var installedApps: InstalledApps?
     @ObservationIgnored private var appNames: [String: String] = [:]
     static let rules = Result { try CleanupRuleSet.bundled().rules }
@@ -105,6 +109,8 @@ final class AppModel {
         basket = []
         rows = []
         suggestions = []
+        largeFiles = []
+        lastUsed = [:]
         volume = VolumeInfo(path: path)
 
         let scanner = DiskScanner { [weak self] files in
@@ -190,6 +196,7 @@ final class AppModel {
             phase = .ready
             refreshRows()
             refreshSuggestions()
+            refreshLargeFiles()
             // The snapshots are gone; hand their freed pages back to the system now
             // instead of whenever memory gets tight.
             Task.detached(priority: .background) {
@@ -327,6 +334,30 @@ final class AppModel {
         }
     }
 
+    /// Lists the largest files, then looks up when each was last opened.
+    func refreshLargeFiles() {
+        guard let tree, !isScanning else { return }
+        let version = treeVersion
+        Task {
+            let files = await Task.detached(priority: .userInitiated) {
+                LargeFileFinder.find(in: tree, minimumSize: 50_000_000)
+            }.value
+            guard version == treeVersion else { return }
+            largeFiles = files
+            let dates = await Task.detached(priority: .utility) {
+                var dates: [Int: Date] = [:]
+                for file in files {
+                    if let date = LargeFileFinder.lastUsedDate(ofFileAt: tree.path(of: file.node)) {
+                        dates[file.node] = date
+                    }
+                }
+                return dates
+            }.value
+            guard version == treeVersion else { return }
+            lastUsed = dates
+        }
+    }
+
     func refreshRunningApps() {
         runningAppIDs = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier?.lowercased() })
     }
@@ -401,6 +432,7 @@ final class AppModel {
         if let selection, tree.isRemoved(selection) { self.selection = nil }
         refreshRows()
         refreshSuggestions()
+        refreshLargeFiles()
         if let path = lastScanPath { volume = VolumeInfo(path: path) }
 
         if !failures.isEmpty {

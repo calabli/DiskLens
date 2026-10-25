@@ -12,14 +12,18 @@ struct DiskLensApp: App {
                 .environment(model)
                 .frame(minWidth: 960, minHeight: 600)
                 .task {
-                    // `--scan <path>` starts scanning right away and `--show cleanup` opens the
-                    // suggestions, for development and scripting.
+                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files` opens
+                    // that page, for development and scripting.
                     let args = CommandLine.arguments
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
                         model.scan((args[i + 1] as NSString).expandingTildeInPath)
                     }
-                    if let i = args.firstIndex(of: "--show"), i + 1 < args.count, args[i + 1] == "cleanup" {
-                        model.section = .cleanup
+                    if let i = args.firstIndex(of: "--show"), i + 1 < args.count {
+                        switch args[i + 1] {
+                        case "cleanup": model.section = .cleanup
+                        case "large-files": model.section = .largeFiles
+                        default: break
+                        }
                     }
                     #if DEBUG
                     // `--demo-zoom <folder under the scan root>`: drill in and back out once
