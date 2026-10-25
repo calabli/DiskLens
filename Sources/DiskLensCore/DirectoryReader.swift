@@ -1,6 +1,6 @@
 import Darwin
 
-public enum EntryKind: UInt8, Sendable {
+public enum EntryKind: UInt8, Sendable, BitwiseCopyable {
     case file
     case directory
     case symlink
@@ -9,7 +9,8 @@ public enum EntryKind: UInt8, Sendable {
 
 /// One directory entry as returned by `getattrlistbulk`.
 struct RawEntry {
-    var name: String
+    /// Where the name's UTF-8 bytes sit in the `names` buffer passed to `read`.
+    var name: Range<Int>
     var kind: EntryKind
     /// Bytes allocated on disk (sum of all forks for files, the directory's own blocks for directories).
     var allocSize: Int64
@@ -41,9 +42,9 @@ final class DirectoryReader {
         buffer.deallocate()
     }
 
-    /// Appends the entries of the directory at `path` to `entries`.
-    /// Returns 0 on success or the `errno` that stopped the read.
-    func read(path: String, into entries: inout [RawEntry]) -> Int32 {
+    /// Appends the entries of the directory at `path` to `entries`, and their
+    /// names to `names`. Returns 0 on success or the `errno` that stopped the read.
+    func read(path: String, into entries: inout [RawEntry], names: inout [UInt8]) -> Int32 {
         let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         if fd < 0 { return errno }
         defer { close(fd) }
@@ -56,7 +57,7 @@ final class DirectoryReader {
             var entryStart = buffer.baseAddress!
             for _ in 0..<count {
                 let length = entryStart.loadUnaligned(as: UInt32.self)
-                if let entry = parse(entryStart) {
+                if let entry = parse(entryStart, names: &names) {
                     entries.append(entry)
                 }
                 entryStart += Int(length)
@@ -67,7 +68,7 @@ final class DirectoryReader {
     // Layout per entry: length, returned bitmap, ATTR_CMN_ERROR (always first, see
     // getattrlistbulk(2)), then common, dir and file attributes in bit order.
     // Only attributes flagged in the returned bitmap are present.
-    private func parse(_ start: UnsafeMutableRawPointer) -> RawEntry? {
+    private func parse(_ start: UnsafeMutableRawPointer, names: inout [UInt8]) -> RawEntry? {
         var field = start + MemoryLayout<UInt32>.size
         let returned = field.loadUnaligned(as: attribute_set_t.self)
         field += MemoryLayout<attribute_set_t>.size
@@ -78,13 +79,17 @@ final class DirectoryReader {
             if error != 0 { return nil }
         }
 
-        var entry = RawEntry(name: "", kind: .other, allocSize: 0, logicalSize: 0,
+        var entry = RawEntry(name: names.count..<names.count, kind: .other, allocSize: 0, logicalSize: 0,
                              fileID: 0, linkCount: 1, device: 0, modTime: 0)
 
         if returned.commonattr & bits(ATTR_CMN_NAME) != 0 {
             let ref = field.loadUnaligned(as: attrreference_t.self)
-            let namePtr = (field + Int(ref.attr_dataoffset)).assumingMemoryBound(to: CChar.self)
-            entry.name = String(cString: namePtr)
+            let namePtr = (field + Int(ref.attr_dataoffset)).assumingMemoryBound(to: UInt8.self)
+            // attr_length counts the terminating NUL.
+            let length = max(Int(ref.attr_length) - 1, 0)
+            let start = names.count
+            names.append(contentsOf: UnsafeBufferPointer(start: namePtr, count: length))
+            entry.name = start..<names.count
             field += MemoryLayout<attrreference_t>.size
         }
         if returned.commonattr & bits(ATTR_CMN_DEVID) != 0 {

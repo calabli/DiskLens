@@ -30,6 +30,7 @@ public final class DiskScanner: @unchecked Sendable {
     private let progress: (@Sendable (_ filesSoFar: Int) -> Void)?
     private let lock = NSLock()
     private var activeBuilder: TreeBuilder?
+    private var activeStart = Date()
     private var cancelRequested = false
 
     public init(options: ScanOptions = ScanOptions(), progress: (@Sendable (Int) -> Void)? = nil) {
@@ -50,6 +51,7 @@ public final class DiskScanner: @unchecked Sendable {
         }
         lock.withLock {
             activeBuilder = builder
+            activeStart = started
             if cancelRequested { builder.cancel() }
         }
         defer { lock.withLock { activeBuilder = nil } }
@@ -62,6 +64,14 @@ public final class DiskScanner: @unchecked Sendable {
             throw ScanError.cannotRead(path: rootPath, errno: code)
         }
         return builder.makeTree(duration: Date().timeIntervalSince(started))
+    }
+
+    /// The tree as scanned so far, or nil when no scan is running. Folders not
+    /// read yet are empty, so sizes only grow. Node ids stay the same in later
+    /// snapshots and in the final tree. Safe to call from any thread.
+    public func snapshot() -> FileTree? {
+        let (builder, started) = lock.withLock { (activeBuilder, activeStart) }
+        return builder?.makeTree(duration: Date().timeIntervalSince(started))
     }
 
     /// Stops a running scan from any thread; `scan` then throws `ScanError.cancelled`.
@@ -81,12 +91,14 @@ private final class TreeBuilder: @unchecked Sendable {
     private let progress: (@Sendable (Int) -> Void)?
 
     // Guarded by `condition`.
-    private var names: [String]
-    private var parents: [Int32] = [-1]
-    private var kinds: [EntryKind] = [.directory]
-    private var ownSizes: [Int64]
-    private var modTimes: [Int64] = [0]
+    private var names = NamePool()
+    private var parents: ChunkedArray<Int32> = [-1]
+    private var kinds: ChunkedArray<EntryKind> = [.directory]
+    private var ownSizes = ChunkedArray<Int64>()
+    private var modTimes: ChunkedArray<Int64> = [0]
+    // Breadth-first: a live view sees every top-level folder early, then watches them grow.
     private var queue: [(node: Int32, path: String)]
+    private var queueHead = 0
     private var pending = 1
     private var seenHardLinks = Set<UInt64>()
     private(set) var stats = ScanStats()
@@ -99,18 +111,20 @@ private final class TreeBuilder: @unchecked Sendable {
         self.rootDevice = rootDevice
         self.stayOnVolume = stayOnVolume
         self.progress = progress
-        names = [rootPath]
-        ownSizes = [rootSize]
+        names.append(rootPath)
+        ownSizes.append(rootSize)
         queue = [(0, rootPath)]
     }
 
     func work() {
         let reader = DirectoryReader()
         var entries: [RawEntry] = []
+        var nameBytes: [UInt8] = []
         while let job = nextJob() {
             entries.removeAll(keepingCapacity: true)
-            let code = reader.read(path: job.path, into: &entries)
-            finish(job, entries: entries, error: code)
+            nameBytes.removeAll(keepingCapacity: true)
+            let code = reader.read(path: job.path, into: &entries, names: &nameBytes)
+            finish(job, entries: entries, names: nameBytes, error: code)
         }
     }
 
@@ -126,8 +140,9 @@ private final class TreeBuilder: @unchecked Sendable {
     func cancel() {
         condition.lock()
         isCancelled = true
-        pending -= queue.count
+        pending -= queue.count - queueHead
         queue.removeAll()
+        queueHead = 0
         condition.broadcast()
         condition.unlock()
     }
@@ -135,14 +150,22 @@ private final class TreeBuilder: @unchecked Sendable {
     private func nextJob() -> (node: Int32, path: String)? {
         condition.lock()
         defer { condition.unlock() }
-        while queue.isEmpty {
+        while queueHead == queue.count {
             if pending == 0 { return nil }
             condition.wait()
         }
-        return queue.removeLast()
+        let job = queue[queueHead]
+        queue[queueHead].path = ""
+        queueHead += 1
+        if queueHead >= 4096 && queueHead * 2 >= queue.count {
+            queue.removeFirst(queueHead)
+            queueHead = 0
+        }
+        return job
     }
 
-    private func finish(_ job: (node: Int32, path: String), entries: [RawEntry], error: Int32) {
+    private func finish(_ job: (node: Int32, path: String), entries: [RawEntry], names nameBytes: [UInt8],
+                        error: Int32) {
         condition.lock()
         defer {
             pending -= 1
@@ -175,14 +198,15 @@ private final class TreeBuilder: @unchecked Sendable {
             }
 
             let node = Int32(names.count)
-            names.append(entry.name)
+            let name = nameBytes[entry.name]
+            names.append(name)
             parents.append(job.node)
             kinds.append(entry.kind)
             ownSizes.append(size)
             modTimes.append(entry.modTime)
 
             if entry.kind == .directory {
-                queue.append((node, prefix + entry.name))
+                queue.append((node, prefix + String(decoding: name, as: UTF8.self)))
                 pending += 1
             }
         }
@@ -192,10 +216,13 @@ private final class TreeBuilder: @unchecked Sendable {
         }
     }
 
+    /// Builds a tree from what has been read so far. Only copying references to
+    /// the arrays happens under the lock; the roll-up and sorting run outside it.
     func makeTree(duration: Double) -> FileTree {
         condition.lock()
-        defer { condition.unlock() }
+        let (names, parents, kinds, ownSizes, modTimes) = (names, parents, kinds, ownSizes, modTimes)
         var stats = stats
+        condition.unlock()
         stats.duration = duration
         return FileTree(rootPath: rootPath, names: names, parents: parents, kinds: kinds,
                         ownSizes: ownSizes, modTimes: modTimes, stats: stats)

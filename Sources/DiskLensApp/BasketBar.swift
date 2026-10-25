@@ -30,6 +30,8 @@ struct BasketBar: View {
                 Button("清空") { model.clearBasket() }
                 Button("移到废纸篓…") { confirming = true }
                     .buttonStyle(.borderedProminent)
+                    .disabled(model.isScanning)
+                    .help(model.isScanning ? "扫描完成后才能移到废纸篓" : "")
             }
         }
         .padding(.horizontal, 12)

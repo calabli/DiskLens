@@ -5,16 +5,17 @@
 /// `parents[i] < i` for every `i > 0`; sizes roll up in one reverse pass.
 public struct FileTree: Sendable {
     public let rootPath: String
-    public let names: [String]
-    public let parents: [Int32]
-    public let kinds: [EntryKind]
+    // Written once by the scanner and shared, not copied, between snapshots.
+    public let names: NamePool
+    public let parents: ChunkedArray<Int32>
+    public let kinds: ChunkedArray<EntryKind>
     /// Bytes allocated by the node itself (0 for a hard link already counted elsewhere).
-    public let ownSizes: [Int64]
+    public let ownSizes: ChunkedArray<Int64>
     /// Bytes allocated by the node and everything under it.
     public private(set) var totalSizes: [Int64]
     /// Number of files at or under the node.
     public private(set) var fileCounts: [Int32]
-    public let modTimes: [Int64]
+    public let modTimes: ChunkedArray<Int64>
     public let stats: ScanStats
 
     // Children in CSR form: the live children of node i are
@@ -27,11 +28,15 @@ public struct FileTree: Sendable {
     public var count: Int { names.count }
     public var totalSize: Int64 { totalSizes.first ?? 0 }
 
-    init(rootPath: String, names: [String], parents: [Int32], kinds: [EntryKind],
-         ownSizes: [Int64], modTimes: [Int64], stats: ScanStats) {
+    init(rootPath: String, names: NamePool, parents: ChunkedArray<Int32>, kinds: ChunkedArray<EntryKind>,
+         ownSizes: ChunkedArray<Int64>, modTimes: ChunkedArray<Int64>, stats: ScanStats) {
         let n = names.count
-        var totals = ownSizes
-        var files = kinds.map { $0 == .directory ? Int32(0) : 1 }
+        var totals = [Int64](repeating: 0, count: n)
+        var files = [Int32](repeating: 0, count: n)
+        for i in 0..<n {
+            totals[i] = ownSizes[i]
+            files[i] = kinds[i] == .directory ? 0 : 1
+        }
         for i in stride(from: n - 1, to: 0, by: -1) {
             let p = Int(parents[i])
             totals[p] += totals[i]

@@ -74,6 +74,7 @@ final class AppModel {
     var alertMessage: String?
 
     private var scanner: DiskScanner?
+    private var snapshotTask: Task<Void, Never>?
     private var scanGeneration = 0
     private var lastScanPath: String?
 
@@ -100,6 +101,30 @@ final class AppModel {
             let result = Result { try scanner.scan(path) }
             await self.finishScan(result, generation: generation)
         }
+        snapshotTask = Task { [weak self] in
+            await self?.followSnapshots(of: scanner, generation: generation)
+        }
+    }
+
+    var isScanning: Bool {
+        if case .scanning = phase { return true }
+        return false
+    }
+
+    /// Shows the tree as it grows. Each snapshot rolls up and sorts the whole
+    /// tree, so the pause between them scales with how long the last one took.
+    private func followSnapshots(of scanner: DiskScanner, generation: Int) async {
+        try? await Task.sleep(for: .milliseconds(300))
+        while !Task.isCancelled {
+            let started = ContinuousClock.now
+            let snapshot = await Task.detached(priority: .utility) { scanner.snapshot() }.value
+            guard !Task.isCancelled, generation == scanGeneration, isScanning, let snapshot else { return }
+            tree = snapshot
+            treeVersion += 1
+            refreshRows()
+            let cost = ContinuousClock.now - started
+            try? await Task.sleep(for: max(.milliseconds(600), cost * 3))
+        }
     }
 
     func rescan() {
@@ -109,8 +134,15 @@ final class AppModel {
     func cancelScan() {
         scanner?.cancel()
         scanner = nil
+        snapshotTask?.cancel()
+        snapshotTask = nil
         scanGeneration += 1
-        if case .scanning = phase { phase = .idle }
+        if isScanning {
+            phase = .idle
+            tree = nil
+            rows = []
+            basket = []
+        }
     }
 
     func chooseFolderAndScan() {
@@ -133,13 +165,26 @@ final class AppModel {
     private func finishScan(_ result: Result<FileTree, Error>, generation: Int) {
         guard generation == scanGeneration else { return }
         scanner = nil
+        snapshotTask?.cancel()
+        snapshotTask = nil
         switch result {
         case let .success(tree):
+            // Node ids from the snapshots are still valid, so the folder being
+            // viewed and the selection carry over.
             self.tree = tree
-            current = 0
+            treeVersion += 1
             phase = .ready
             refreshRows()
+            // The snapshots are gone; hand their freed pages back to the system now
+            // instead of whenever memory gets tight.
+            Task.detached(priority: .background) {
+                try? await Task.sleep(for: .seconds(1))
+                malloc_zone_pressure_relief(nil, 0)
+            }
         case let .failure(error):
+            tree = nil
+            rows = []
+            basket = []
             if case ScanError.cancelled = error {
                 phase = .idle
             } else {
@@ -272,7 +317,7 @@ final class AppModel {
 
     /// Moves every basket item to the Trash and takes it out of the tree.
     func trashBasket() {
-        guard var tree else { return }
+        guard !isScanning, var tree else { return }
         var failures: [String] = []
         for node in basket {
             let url = URL(fileURLWithPath: tree.path(of: node))

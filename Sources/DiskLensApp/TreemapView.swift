@@ -18,7 +18,27 @@ struct TreemapView: View {
     @State private var items: [TreemapItem] = []
     @State private var layoutID = 0
     @State private var hovered: Int?
-    @State private var hoverLocation: CGPoint = .zero
+    @State private var hoverLocation: CGPoint?
+    @State private var zoom = Zoom.identity
+    @State private var pendingZoom: PendingZoom?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Maps the new layout onto where it sat in the old one, animated back to identity.
+    private struct Zoom: Equatable {
+        var scaleX: CGFloat = 1
+        var scaleY: CGFloat = 1
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var opacity: Double = 1
+        static let identity = Zoom()
+    }
+
+    private enum PendingZoom {
+        /// Drilled into a folder that was drawn at this rect.
+        case into(CGRect)
+        /// Went up from this folder, which the new layout draws somewhere inside.
+        case outOf(Int)
+    }
 
     private struct LayoutKey: Equatable {
         var node: Int
@@ -30,9 +50,14 @@ struct TreemapView: View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 if let tree = model.tree {
-                    TreemapBlocks(items: items, tree: tree, layoutID: layoutID)
-                        .equatable()
-                    highlights(tree: tree)
+                    ZStack(alignment: .topLeading) {
+                        TreemapBlocks(items: items, tree: tree, layoutID: layoutID)
+                            .equatable()
+                        highlights(tree: tree)
+                    }
+                    .scaleEffect(x: zoom.scaleX, y: zoom.scaleY, anchor: .topLeading)
+                    .offset(x: zoom.x, y: zoom.y)
+                    .opacity(zoom.opacity)
                     if let hovered, hovered < items.count {
                         Tooltip(item: items[hovered], tree: tree)
                             .fixedSize()
@@ -49,6 +74,7 @@ struct TreemapView: View {
                     let hit = hitTest(location)
                     if hit != hovered { hovered = hit }
                 case .ended:
+                    hoverLocation = nil
                     hovered = nil
                 }
             }
@@ -58,13 +84,16 @@ struct TreemapView: View {
                     .exclusively(before: SpatialTapGesture().onEnded { selectBlock(at: $0.location) })
             )
             .onDrag {
-                guard let node = topLevelNode(at: hoverLocation) else { return NSItemProvider() }
+                guard let location = hoverLocation, let node = topLevelNode(at: location) else { return NSItemProvider() }
                 return NSItemProvider(object: NodeDrag.payload(node) as NSString)
             }
             .contextMenu {
                 if let node = hoveredNode {
                     NodeMenu(node: node)
                 }
+            }
+            .onChange(of: model.current) { old, new in
+                prepareZoom(from: old, to: new)
             }
             .task(id: LayoutKey(node: model.current, version: model.treeVersion, size: geo.size)) {
                 await relayout(size: geo.size)
@@ -111,9 +140,50 @@ struct TreemapView: View {
             TreemapLayout.layout(tree, root: root, in: bounds)
         }.value
         guard !Task.isCancelled else { return }
+        let start = pendingZoom.flatMap { zoomStart(for: $0, in: result, size: size) }
+        pendingZoom = nil
         items = result
         layoutID += 1
-        hovered = nil
+        // Keep the tooltip on whatever is under the cursor now (the map refreshes during a scan).
+        hovered = hoverLocation.flatMap(hitTest)
+
+        if let start {
+            zoom = start
+            try? await Task.sleep(for: .milliseconds(16))
+            withAnimation(.easeOut(duration: 0.28)) { zoom = .identity }
+        } else {
+            zoom = .identity
+        }
+    }
+
+    private func prepareZoom(from old: Int, to new: Int) {
+        guard !reduceMotion, let tree = model.tree else {
+            pendingZoom = nil
+            return
+        }
+        if tree.isAncestor(old, of: new), let item = items.first(where: { Int($0.node) == new }) {
+            pendingZoom = .into(item.rect)
+        } else if tree.isAncestor(new, of: old) {
+            pendingZoom = .outOf(old)
+        } else {
+            pendingZoom = nil
+        }
+    }
+
+    private func zoomStart(for pending: PendingZoom, in newItems: [TreemapItem], size: CGSize) -> Zoom? {
+        switch pending {
+        case let .into(rect):
+            // The new map starts squeezed into the block that was double-clicked.
+            return Zoom(scaleX: rect.width / size.width, scaleY: rect.height / size.height,
+                        x: rect.minX, y: rect.minY, opacity: 0.4)
+        case let .outOf(node):
+            // The new map starts blown up so the folder we left fills the view.
+            guard let rect = newItems.first(where: { Int($0.node) == node })?.rect,
+                  rect.width > 0, rect.height > 0 else { return nil }
+            let sx = size.width / rect.width
+            let sy = size.height / rect.height
+            return Zoom(scaleX: sx, scaleY: sy, x: -rect.minX * sx, y: -rect.minY * sy, opacity: 0.4)
+        }
     }
 
     /// Index of the deepest block under `point`.
@@ -139,6 +209,7 @@ struct TreemapView: View {
     private func tooltipPosition(in size: CGSize) -> CGPoint {
         // Center of a ~260×70 tooltip, kept inside the view and off the cursor.
         let width: CGFloat = 260, height: CGFloat = 70
+        let hoverLocation = hoverLocation ?? .zero
         var x = hoverLocation.x + 16 + width / 2
         var y = hoverLocation.y + 18 + height / 2
         if x + width / 2 > size.width { x = hoverLocation.x - 16 - width / 2 }

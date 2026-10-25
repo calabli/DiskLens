@@ -13,7 +13,11 @@ struct ContentView: View {
             case .idle:
                 WelcomeView()
             case let .scanning(path, files):
-                ScanningView(path: path, files: files)
+                if let tree = model.tree {
+                    BrowserView(tree: tree)
+                } else {
+                    ScanningView(path: path, files: files)
+                }
             case let .failed(message):
                 ContentUnavailableView {
                     Label("扫描失败", systemImage: "exclamationmark.triangle")
@@ -157,14 +161,16 @@ struct BrowserView: View {
             HStack(spacing: 16) {
                 Breadcrumb()
                 Spacer(minLength: 8)
-                if let volume = model.volume {
+                if case let .scanning(_, files) = model.phase {
+                    ScanStatus(files: files)
+                } else if let volume = model.volume {
                     VolumeBar(volume: volume)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             Divider()
-            if tree.stats.unreadableDirectories > 0 {
+            if !model.isScanning && tree.stats.unreadableDirectories > 0 {
                 UnreadableBanner(count: tree.stats.unreadableDirectories)
                 Divider()
             }
@@ -211,6 +217,25 @@ private struct Breadcrumb: View {
                         .padding(.leading, 8)
                 }
             }
+        }
+    }
+}
+
+private struct ScanStatus: View {
+    @Environment(AppModel.self) private var model
+    let files: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("正在扫描 · 已发现 \(files.formatted()) 个文件")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Button("取消") { model.cancelScan() }
+                .controlSize(.small)
+                .keyboardShortcut(.cancelAction)
         }
     }
 }

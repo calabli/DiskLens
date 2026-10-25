@@ -141,3 +141,20 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
         try scanner.scan(box.root)
     }
 }
+
+@Test func snapshotIsNilWhenIdleAndFinalTreeKeepsNodeIds() throws {
+    let box = try Sandbox()
+    for i in 0..<200 {
+        try box.write("d\(i % 10)/f\(i).bin", bytes: 100)
+    }
+    let scanner = DiskScanner()
+    #expect(scanner.snapshot() == nil)
+
+    let tree = try scanner.scan(box.root)
+
+    #expect(scanner.snapshot() == nil)
+    // Snapshots are prefixes of the final arrays, so ids taken from one stay valid.
+    for node in 1..<tree.count {
+        #expect(Int(tree.parents[node]) < node)
+    }
+}
