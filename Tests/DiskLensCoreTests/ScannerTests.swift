@@ -49,7 +49,7 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     try box.write("a/b/two.bin", bytes: 300_000)
     try box.write("c/three.bin", bytes: 1)
 
-    let tree = try Scanner().scan(box.root)
+    let tree = try DiskScanner().scan(box.root)
 
     #expect(tree.stats.files == 3)
     #expect(tree.stats.unreadableDirectories == 0)
@@ -67,7 +67,7 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     try box.write("big/y.bin", bytes: 2_000_000)
     try box.write("medium/z.bin", bytes: 200_000)
 
-    let tree = try Scanner().scan(box.root)
+    let tree = try DiskScanner().scan(box.root)
 
     let names = tree.children(of: 0).map { tree.names[Int($0)] }
     #expect(names == ["big", "medium", "small"])
@@ -81,7 +81,7 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     try FileManager.default.createDirectory(atPath: box.root + "/links", withIntermediateDirectories: true)
     #expect(link(box.root + "/original.bin", box.root + "/links/copy.bin") == 0)
 
-    let tree = try Scanner().scan(box.root)
+    let tree = try DiskScanner().scan(box.root)
 
     #expect(tree.stats.files == 2)
     #expect(tree.stats.duplicateHardLinks == 1)
@@ -95,7 +95,7 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     try box.write("data/big.bin", bytes: 1_000_000)
     try FileManager.default.createSymbolicLink(atPath: box.root + "/alias", withDestinationPath: box.root + "/data")
 
-    let tree = try Scanner().scan(box.root)
+    let tree = try DiskScanner().scan(box.root)
 
     let alias = try #require(node(tree, "alias"))
     #expect(tree.kinds[alias] == .symlink)
@@ -113,8 +113,8 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     var many = ScanOptions()
     many.threadCount = 8
 
-    let a = try Scanner(options: single).scan(box.root)
-    let b = try Scanner(options: many).scan(box.root)
+    let a = try DiskScanner(options: single).scan(box.root)
+    let b = try DiskScanner(options: many).scan(box.root)
 
     #expect(a.totalSize == b.totalSize)
     #expect(a.count == b.count)
@@ -122,7 +122,7 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
 
 @Test func missingRootThrows() {
     #expect(throws: ScanError.self) {
-        try Scanner().scan("/definitely/not/here/\(UUID().uuidString)")
+        try DiskScanner().scan("/definitely/not/here/\(UUID().uuidString)")
     }
 }
 
@@ -130,4 +130,14 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     #expect(ByteFormat.string(999) == "999 B")
     #expect(ByteFormat.string(1_500_000) == "1.5 MB")
     #expect(ByteFormat.string(123_000_000_000) == "123 GB")
+}
+
+@Test func cancelledScanThrows() throws {
+    let box = try Sandbox()
+    try box.write("a/b.bin", bytes: 1_000)
+    let scanner = DiskScanner()
+    scanner.cancel()
+    #expect(throws: ScanError.self) {
+        try scanner.scan(box.root)
+    }
 }

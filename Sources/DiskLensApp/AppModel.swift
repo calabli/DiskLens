@@ -1,0 +1,314 @@
+import AppKit
+import DiskLensCore
+import Observation
+import SwiftUI
+
+/// One row of the folder list: a child of the folder being viewed.
+struct FolderRow: Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let size: Int64
+    /// Share of the folder being viewed, 0...1.
+    let share: Double
+    /// Size relative to the largest sibling, 0...1, for the size bar.
+    let relative: Double
+    let files: Int32
+    let modified: Date
+    let isDirectory: Bool
+    let category: FileCategory
+}
+
+/// Space on the volume being scanned, as Finder reports it.
+struct VolumeInfo: Equatable {
+    let name: String
+    let total: Int64
+    /// Free right now.
+    let available: Int64
+    /// Free once macOS clears purgeable data (caches, local snapshots, iCloud copies).
+    let availableForImportantUsage: Int64
+
+    var purgeable: Int64 { max(availableForImportantUsage - available, 0) }
+    var used: Int64 { max(total - availableForImportantUsage, 0) }
+
+    init?(path: String) {
+        let keys: Set<URLResourceKey> = [.volumeLocalizedNameKey, .volumeTotalCapacityKey,
+                                         .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
+        guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys),
+              let total = values.volumeTotalCapacity, let available = values.volumeAvailableCapacity
+        else { return nil }
+        name = values.volumeLocalizedName ?? "磁盘"
+        self.total = Int64(total)
+        self.available = Int64(available)
+        availableForImportantUsage = values.volumeAvailableCapacityForImportantUsage ?? Int64(available)
+    }
+}
+
+@MainActor @Observable
+final class AppModel {
+    enum Phase: Equatable {
+        case idle
+        case scanning(path: String, files: Int)
+        case ready
+        case failed(String)
+    }
+
+    static let homePath = NSHomeDirectory()
+    /// The data volume holds everything users and apps write; scanning "/" would stop at its firmlinks.
+    static let wholeDiskPath = "/System/Volumes/Data"
+
+    private(set) var phase: Phase = .idle
+    private(set) var tree: FileTree?
+    /// The folder whose contents the list and treemap show.
+    private(set) var current = 0
+    /// A child of `current`, shared by the list and the treemap.
+    var selection: Int?
+    var sortOrder = [KeyPathComparator(\FolderRow.size, order: .reverse)] {
+        didSet { refreshRows() }
+    }
+    private(set) var rows: [FolderRow] = []
+    private(set) var basket: [Int] = []
+    private(set) var volume: VolumeInfo?
+    /// Bumped whenever the tree changes in place, so views redo their layout.
+    private(set) var treeVersion = 0
+    var previewURL: URL?
+    var alertMessage: String?
+
+    private var scanner: DiskScanner?
+    private var scanGeneration = 0
+    private var lastScanPath: String?
+
+    // MARK: Scanning
+
+    func scan(_ path: String) {
+        cancelScan()
+        scanGeneration += 1
+        let generation = scanGeneration
+        lastScanPath = path
+        phase = .scanning(path: path, files: 0)
+        tree = nil
+        current = 0
+        selection = nil
+        basket = []
+        rows = []
+        volume = VolumeInfo(path: path)
+
+        let scanner = DiskScanner { [weak self] files in
+            Task { @MainActor in self?.reportProgress(files, path: path, generation: generation) }
+        }
+        self.scanner = scanner
+        Task.detached(priority: .userInitiated) {
+            let result = Result { try scanner.scan(path) }
+            await self.finishScan(result, generation: generation)
+        }
+    }
+
+    func rescan() {
+        if let lastScanPath { scan(lastScanPath) }
+    }
+
+    func cancelScan() {
+        scanner?.cancel()
+        scanner = nil
+        scanGeneration += 1
+        if case .scanning = phase { phase = .idle }
+    }
+
+    func chooseFolderAndScan() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "扫描"
+        panel.message = "选择要分析的文件夹"
+        if panel.runModal() == .OK, let url = panel.url {
+            scan(url.path)
+        }
+    }
+
+    private func reportProgress(_ files: Int, path: String, generation: Int) {
+        guard generation == scanGeneration, case .scanning = phase else { return }
+        phase = .scanning(path: path, files: files)
+    }
+
+    private func finishScan(_ result: Result<FileTree, Error>, generation: Int) {
+        guard generation == scanGeneration else { return }
+        scanner = nil
+        switch result {
+        case let .success(tree):
+            self.tree = tree
+            current = 0
+            phase = .ready
+            refreshRows()
+        case let .failure(error):
+            if case ScanError.cancelled = error {
+                phase = .idle
+            } else {
+                phase = .failed(String(describing: error))
+            }
+        }
+    }
+
+    // MARK: Navigation
+
+    var canGoUp: Bool { tree != nil && current != 0 }
+
+    /// The folders from the scan root down to `current`.
+    var breadcrumb: [Int] {
+        guard let tree else { return [] }
+        var chain: [Int] = []
+        var i = current
+        while i >= 0 {
+            chain.append(i)
+            i = i == 0 ? -1 : Int(tree.parents[i])
+        }
+        return chain.reversed()
+    }
+
+    func open(_ node: Int) {
+        guard let tree, tree.kinds[node] == .directory, !tree.children(of: node).isEmpty else { return }
+        current = node
+        selection = nil
+        refreshRows()
+    }
+
+    func goUp() {
+        guard let tree, current != 0 else { return }
+        let child = current
+        current = Int(tree.parents[current])
+        refreshRows()
+        selection = child
+    }
+
+    func goTo(_ node: Int) {
+        guard node != current else { return }
+        current = node
+        selection = nil
+        refreshRows()
+    }
+
+    /// The child of `current` that contains `node`, if any.
+    func childOfCurrent(containing node: Int) -> Int? {
+        guard let tree else { return nil }
+        var i = node
+        while i > 0 {
+            let parent = Int(tree.parents[i])
+            if parent == current { return i }
+            i = parent
+        }
+        return nil
+    }
+
+    func url(of node: Int) -> URL? {
+        guard let tree else { return nil }
+        return URL(fileURLWithPath: tree.path(of: node))
+    }
+
+    func revealInFinder(_ node: Int) {
+        guard let url = url(of: node) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func copyPath(_ node: Int) {
+        guard let tree else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(tree.path(of: node), forType: .string)
+    }
+
+    func togglePreview() {
+        if previewURL != nil {
+            previewURL = nil
+        } else if let selection {
+            previewURL = url(of: selection)
+        }
+    }
+
+    private func refreshRows() {
+        guard let tree else {
+            rows = []
+            return
+        }
+        let total = max(Double(tree.totalSizes[current]), 1)
+        let largest = max(Double(tree.children(of: current).first.map { tree.totalSizes[Int($0)] } ?? 1), 1)
+        rows = tree.children(of: current).map { child in
+            let c = Int(child)
+            let size = tree.totalSizes[c]
+            return FolderRow(id: c, name: tree.names[c], size: size,
+                             share: Double(size) / total, relative: Double(size) / largest,
+                             files: tree.fileCounts[c],
+                             modified: Date(timeIntervalSince1970: TimeInterval(tree.modTimes[c])),
+                             isDirectory: tree.kinds[c] == .directory,
+                             category: FileCategory.of(name: tree.names[c], kind: tree.kinds[c]))
+        }
+        .sorted(using: sortOrder)
+    }
+
+    // MARK: Basket
+
+    var basketTotal: Int64 {
+        guard let tree else { return 0 }
+        return basket.reduce(0) { $0 + tree.totalSizes[$1] }
+    }
+
+    func isInBasket(_ node: Int) -> Bool {
+        guard let tree else { return false }
+        return basket.contains { tree.isAncestor($0, of: node) }
+    }
+
+    /// Adds `node`; an item already covered by a folder in the basket is ignored,
+    /// and items inside `node` are replaced by it.
+    func addToBasket(_ node: Int) {
+        guard let tree, node > 0, !tree.isRemoved(node), !isInBasket(node) else { return }
+        basket.removeAll { tree.isAncestor(node, of: $0) }
+        basket.append(node)
+    }
+
+    func removeFromBasket(_ node: Int) {
+        basket.removeAll { $0 == node }
+    }
+
+    func clearBasket() {
+        basket = []
+    }
+
+    /// Moves every basket item to the Trash and takes it out of the tree.
+    func trashBasket() {
+        guard var tree else { return }
+        var failures: [String] = []
+        for node in basket {
+            let url = URL(fileURLWithPath: tree.path(of: node))
+            do {
+                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                tree.remove(node)
+            } catch {
+                failures.append("\(tree.names[node])：\(error.localizedDescription)")
+            }
+        }
+        basket = []
+        self.tree = tree
+        treeVersion += 1
+
+        // Stay inside a folder that still exists.
+        while current != 0 && tree.isRemoved(current) {
+            current = Int(tree.parents[current])
+        }
+        if let selection, tree.isRemoved(selection) { self.selection = nil }
+        refreshRows()
+        if let path = lastScanPath { volume = VolumeInfo(path: path) }
+
+        if !failures.isEmpty {
+            alertMessage = "有 \(failures.count) 项没能移到废纸篓：\n" + failures.prefix(5).joined(separator: "\n")
+        }
+    }
+}
+
+/// Drag payload for a node, as plain text so it works with the standard String transfer type.
+enum NodeDrag {
+    static let prefix = "disklens-node:"
+
+    static func payload(_ node: Int) -> String { prefix + String(node) }
+
+    static func node(from payload: String) -> Int? {
+        guard payload.hasPrefix(prefix) else { return nil }
+        return Int(payload.dropFirst(prefix.count))
+    }
+}

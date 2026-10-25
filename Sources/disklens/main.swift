@@ -51,7 +51,7 @@ let rootPath = (path as NSString).expandingTildeInPath
 
 let tree: FileTree
 do {
-    tree = try Scanner(options: options).scan(rootPath)
+    tree = try DiskScanner(options: options).scan(rootPath)
 } catch {
     FileHandle.standardError.write("disklens: \(error)\n".data(using: .utf8)!)
     exit(1)

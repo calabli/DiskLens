@@ -12,20 +12,25 @@ public struct ScanOptions: Sendable {
 public enum ScanError: Error, CustomStringConvertible {
     case cannotRead(path: String, errno: Int32)
     case notADirectory(path: String)
+    case cancelled
 
     public var description: String {
         switch self {
         case let .cannotRead(path, code): "cannot read \(path): \(String(cString: strerror(code)))"
         case let .notADirectory(path): "\(path) is not a directory"
+        case .cancelled: "scan cancelled"
         }
     }
 }
 
 /// Walks a directory tree on several threads. Each thread reads whole directories
 /// with `DirectoryReader` and hands the entries to a shared builder under a lock.
-public final class Scanner: @unchecked Sendable {
+public final class DiskScanner: @unchecked Sendable {
     public let options: ScanOptions
     private let progress: (@Sendable (_ filesSoFar: Int) -> Void)?
+    private let lock = NSLock()
+    private var activeBuilder: TreeBuilder?
+    private var cancelRequested = false
 
     public init(options: ScanOptions = ScanOptions(), progress: (@Sendable (Int) -> Void)? = nil) {
         self.options = options
@@ -43,13 +48,28 @@ public final class Scanner: @unchecked Sendable {
         let threads = (0..<options.threadCount).map { _ in
             Thread { builder.work() }
         }
+        lock.withLock {
+            activeBuilder = builder
+            if cancelRequested { builder.cancel() }
+        }
+        defer { lock.withLock { activeBuilder = nil } }
         threads.forEach { $0.stackSize = 1 << 20; $0.start() }
         builder.waitUntilDone()
+
+        if builder.isCancelled { throw ScanError.cancelled }
 
         if builder.stats.directories == 0, let code = builder.rootError {
             throw ScanError.cannotRead(path: rootPath, errno: code)
         }
         return builder.makeTree(duration: Date().timeIntervalSince(started))
+    }
+
+    /// Stops a running scan from any thread; `scan` then throws `ScanError.cancelled`.
+    public func cancel() {
+        lock.withLock {
+            cancelRequested = true
+            activeBuilder?.cancel()
+        }
     }
 }
 
@@ -71,6 +91,7 @@ private final class TreeBuilder: @unchecked Sendable {
     private var seenHardLinks = Set<UInt64>()
     private(set) var stats = ScanStats()
     private(set) var rootError: Int32?
+    private(set) var isCancelled = false
 
     init(rootPath: String, rootDevice: Int32, rootSize: Int64, stayOnVolume: Bool,
          progress: (@Sendable (Int) -> Void)?) {
@@ -102,6 +123,15 @@ private final class TreeBuilder: @unchecked Sendable {
         condition.unlock()
     }
 
+    func cancel() {
+        condition.lock()
+        isCancelled = true
+        pending -= queue.count
+        queue.removeAll()
+        condition.broadcast()
+        condition.unlock()
+    }
+
     private func nextJob() -> (node: Int32, path: String)? {
         condition.lock()
         defer { condition.unlock() }
@@ -120,6 +150,7 @@ private final class TreeBuilder: @unchecked Sendable {
             condition.unlock()
         }
 
+        if isCancelled { return }
         stats.directories += 1
         if error != 0 {
             if job.node == 0 { rootError = error }

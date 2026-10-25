@@ -7,10 +7,12 @@ let package = Package(
     products: [
         .library(name: "DiskLensCore", targets: ["DiskLensCore"]),
         .executable(name: "disklens", targets: ["disklens"]),
+        .executable(name: "DiskLensApp", targets: ["DiskLensApp"]),
     ],
     targets: [
         .target(name: "DiskLensCore"),
         .executableTarget(name: "disklens", dependencies: ["DiskLensCore"]),
+        .executableTarget(name: "DiskLensApp", dependencies: ["DiskLensCore"]),
         .testTarget(name: "DiskLensCoreTests", dependencies: ["DiskLensCore"]),
     ]
 )
