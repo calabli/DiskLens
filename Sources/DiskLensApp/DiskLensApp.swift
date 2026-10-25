@@ -12,7 +12,7 @@ struct DiskLensApp: App {
                 .environment(model)
                 .frame(minWidth: 960, minHeight: 600)
                 .task {
-                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files` opens
+                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes` opens
                     // that page, for development and scripting.
                     let args = CommandLine.arguments
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
@@ -22,6 +22,7 @@ struct DiskLensApp: App {
                         switch args[i + 1] {
                         case "cleanup": model.section = .cleanup
                         case "large-files": model.section = .largeFiles
+                        case "changes": model.section = .changes
                         default: break
                         }
                     }
@@ -46,7 +47,10 @@ struct DiskLensApp: App {
                 Divider()
                 Button("重新扫描") { model.rescan() }
                     .keyboardShortcut("r", modifiers: .command)
-                    .disabled(model.tree == nil)
+                    .disabled(model.tree == nil || model.isBusy)
+                Button("完整重新扫描") { model.fullRescan() }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
+                    .disabled(model.tree == nil || model.isBusy)
             }
             CommandMenu("前往") {
                 Button("上一级") { model.goUp() }

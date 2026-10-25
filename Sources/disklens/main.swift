@@ -2,7 +2,7 @@ import DiskLensCore
 import Foundation
 
 let usage = """
-    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest]
+    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest] [--use-cache]
 
       --top N        largest N children to list per level (default 15)
       --depth D      how many levels to expand (default 1)
@@ -10,6 +10,8 @@ let usage = """
       --all-volumes  descend into other mounted volumes
       --kb           print only the total in 1024-byte blocks, like `du -sk`
       --suggest      print cleanup suggestions instead of the largest items
+      --use-cache    update the saved scan from the change journal instead of rescanning,
+                     then print what changed and save the new result
     """
 
 var path: String?
@@ -17,6 +19,7 @@ var top = 15
 var depth = 1
 var kbOnly = false
 var suggest = false
+var useCache = false
 var options = ScanOptions()
 
 var args = CommandLine.arguments.dropFirst().makeIterator()
@@ -35,6 +38,7 @@ while let arg = args.next() {
     case "--all-volumes": options.stayOnVolume = false
     case "--kb": kbOnly = true
     case "--suggest": suggest = true
+    case "--use-cache": useCache = true
     case "-h", "--help":
         print(usage)
         exit(0)
@@ -52,9 +56,45 @@ guard let path else {
 }
 let rootPath = (path as NSString).expandingTildeInPath
 
+func seconds(since start: Date) -> String { String(format: "%.2f s", Date().timeIntervalSince(start)) }
+
 let tree: FileTree
 do {
-    tree = try DiskScanner(options: options).scan(rootPath)
+    if useCache {
+        let cache = ScanCache.standard
+        let eventID = ChangeJournal.currentEventID()
+        let journalID = ChangeJournal.journalID(for: rootPath)
+        var started = Date()
+        if let cached = cache.load(rootPath: rootPath) {
+            print("loaded cached scan from \(cached.scannedAt.formatted()) in \(seconds(since: started))")
+            started = Date()
+            let changes = cached.journalID == journalID
+                ? ChangeJournal.changes(under: rootPath, since: cached.eventID) : nil
+            if let changes {
+                print("journal: \(changes.folders.count) changed folders, \(changes.subtrees.count) subtrees in \(seconds(since: started))")
+                started = Date()
+                tree = try TreeUpdater.update(cached.tree, applying: changes, options: options)
+                print("updated in \(seconds(since: started))")
+            } else {
+                print("journal unavailable, scanning everything")
+                tree = try DiskScanner(options: options).scan(rootPath)
+            }
+            let comparison = ScanComparison(previous: cached.tree, previousDate: cached.scannedAt, current: tree)
+            print("since last scan: \(comparison.delta >= 0 ? "+" : "-")\(ByteFormat.string(abs(comparison.delta)))")
+            for change in comparison.changes.prefix(top) {
+                let sign = change.delta >= 0 ? "+" : "-"
+                print("  \(sign)\(ByteFormat.string(abs(change.delta)).padding(toLength: 9, withPad: " ", startingAt: 0)) \(change.path)")
+            }
+        } else {
+            tree = try DiskScanner(options: options).scan(rootPath)
+            print("no cached scan; scanned in \(seconds(since: started))")
+        }
+        started = Date()
+        try cache.save(CachedScan(tree: tree, scannedAt: Date(), eventID: eventID, journalID: journalID))
+        print("saved to \(cache.url(forRoot: rootPath).path) in \(seconds(since: started))\n")
+    } else {
+        tree = try DiskScanner(options: options).scan(rootPath)
+    }
 } catch {
     FileHandle.standardError.write("disklens: \(error)\n".data(using: .utf8)!)
     exit(1)

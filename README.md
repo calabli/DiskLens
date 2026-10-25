@@ -35,6 +35,18 @@ Folders protected by macOS privacy controls are reported as unreadable unless th
 - `FileTree` stores the result as flat parallel arrays and rolls sizes up in one pass. Children are sorted largest first. `remove(_:)` takes trashed items out and keeps that order.
 - `TreemapLayout` lays out nested folders as squarified blocks, skipping blocks smaller than 3 pt and stopping at 60,000 blocks.
 
+## Saved scans and changes
+
+Every finished scan is saved to `~/Library/Caches/app.disklens.DiskLens/Scans` (LZ4-compressed, about 20 MB for 1.6M entries), along with the FSEvents event id taken just before it started. Scanning the same folder again shows the saved result at once and brings it up to date:
+
+- `ChangeJournal` asks FSEvents which folders changed since that event id. macOS keeps this journal even while DiskLens is not running.
+- `TreeUpdater` re-reads only those folders: unchanged folders are copied over, and new folders are scanned. The result matches a fresh scan. On a home folder this takes about 1 s instead of about 8 s.
+- If the journal cannot tell (history dropped, another volume, the root replaced), DiskLens falls back to a full scan. ⇧⌘R always does a full scan.
+
+`ScanComparison` then lists what grew or shrank by at least 50 MB, naming the most specific folder or file behind each change. A folder that appeared or vanished as a whole is listed as that folder. Each scan's total is appended to `history.json` for the coming space timeline.
+
+`disklens <path> --use-cache` does the same in Terminal and prints the timings.
+
 ## Cleanup suggestions
 
 `CleanupAdvisor` turns a scanned tree into suggestions in three tiers: safe to clean (caches and anything rebuilt automatically), review (probably unneeded, check each item), and info only (clean with a command, or not at all). It only ever suggests items inside the home folder, and it reads the tree in memory, so it takes well under a second.

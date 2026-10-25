@@ -90,6 +90,18 @@ public struct FileTree: Sendable {
         return base + "/" + parts.reversed().joined(separator: "/")
     }
 
+    /// The node at `path`, if the tree has it (not removed).
+    public func node(atPath path: String) -> Int? {
+        let base = rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath
+        guard path == base || path.hasPrefix(base + "/") || base.isEmpty else { return nil }
+        var node = 0
+        for part in path.dropFirst(base.count).split(separator: "/") {
+            guard let next = children(of: node).first(where: { names[Int($0)] == part }) else { return nil }
+            node = Int(next)
+        }
+        return node
+    }
+
     /// Whether `ancestor` is `node` itself or one of the folders containing it.
     public func isAncestor(_ ancestor: Int, of node: Int) -> Bool {
         var i = node
@@ -98,6 +110,11 @@ public struct FileTree: Sendable {
             i = i == 0 ? -1 : Int(parents[i])
         }
         return false
+    }
+
+    /// Whether `node` itself was removed (not counting its folders).
+    func isRemovedItself(_ node: Int) -> Bool {
+        removed[node]
     }
 
     /// Whether `node` or a folder containing it was removed with `remove(_:)`.

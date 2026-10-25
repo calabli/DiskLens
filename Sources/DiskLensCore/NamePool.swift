@@ -20,6 +20,16 @@ public struct NamePool: Sendable, ExpressibleByArrayLiteral {
         }
     }
 
+    /// Calls `body` with the UTF-8 bytes of name `index`, without making a `String`.
+    func withUTF8<R>(_ index: Int, _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
+        bytes.withContiguous(start: Int(starts[index]), count: Int(lengths[index]), body)
+    }
+
+    /// Appends name `index` of `other`, copying bytes rather than going through `String`.
+    mutating func append(_ index: Int, of other: NamePool) {
+        other.withUTF8(index) { append(bytes: $0) }
+    }
+
     public mutating func append(_ name: String) {
         Array(name.utf8).withUnsafeBufferPointer { append(bytes: $0) }
     }
@@ -28,7 +38,7 @@ public struct NamePool: Sendable, ExpressibleByArrayLiteral {
         name.withUnsafeBufferPointer { append(bytes: $0) }
     }
 
-    private mutating func append(bytes name: UnsafeBufferPointer<UInt8>) {
+    mutating func append(bytes name: UnsafeBufferPointer<UInt8>) {
         // APFS names are at most 255 characters (≤ 765 UTF-8 bytes); only a
         // pathological root path could exceed this.
         let kept = UnsafeBufferPointer(rebasing: name.prefix(Int(UInt16.max)))

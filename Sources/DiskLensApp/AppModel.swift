@@ -77,6 +77,7 @@ final class AppModel {
         case overview
         case cleanup
         case largeFiles
+        case changes
     }
 
     var section: Section = .overview
@@ -84,6 +85,15 @@ final class AppModel {
     private(set) var isAnalyzing = false
     private(set) var runningAppIDs: Set<String> = []
     private(set) var largeFiles: [LargeFile] = []
+    /// Bringing a saved or shown result up to date from the change journal.
+    private(set) var isUpdating = false
+    /// When the result on screen was scanned, while it is a saved one being updated.
+    private(set) var showingSavedScanFrom: Date?
+    /// What changed since the previous scan of this folder.
+    private(set) var comparison: ScanComparison?
+    @ObservationIgnored private var baseScan: (scannedAt: Date, eventID: UInt64, journalID: String?)?
+    nonisolated static let cache = ScanCache.standard
+    nonisolated static let history = ScanHistory(directory: ScanCache.standard.directory)
     /// When each large file was last opened, from Spotlight; filled in after the list.
     private(set) var lastUsed: [Int: Date] = [:]
     @ObservationIgnored private var installedApps: InstalledApps?
@@ -97,12 +107,71 @@ final class AppModel {
 
     // MARK: Scanning
 
-    func scan(_ path: String) {
+    /// Scans `path`. A saved result of an earlier scan is shown right away and
+    /// brought up to date from the change journal, unless `full` asks for a fresh scan.
+    func scan(_ path: String, full: Bool = false) {
+        let previous = tree.flatMap { tree in
+            tree.rootPath == path ? baseScan.map { (tree, $0.scannedAt) } : nil
+        }
         cancelScan()
         scanGeneration += 1
         let generation = scanGeneration
         lastScanPath = path
+        resetForNewScan()
+        volume = VolumeInfo(path: path)
+        // Taken before reading anything, so changes made during the scan show up next time.
+        let eventID = ChangeJournal.currentEventID()
+        let journalID = ChangeJournal.journalID(for: path)
         phase = .scanning(path: path, files: 0)
+
+        guard !full, FileManager.default.fileExists(atPath: Self.cache.url(forRoot: path).path) else {
+            startFullScan(path, eventID: eventID, journalID: journalID, previous: previous, generation: generation)
+            return
+        }
+        isUpdating = true
+        Task {
+            let saved = await Task.detached(priority: .userInitiated) { Self.cache.load(rootPath: path) }.value
+            guard generation == scanGeneration else { return }
+            guard let saved else {
+                isUpdating = false
+                startFullScan(path, eventID: eventID, journalID: journalID, previous: previous, generation: generation)
+                return
+            }
+            tree = saved.tree
+            treeVersion += 1
+            current = 0
+            phase = .ready
+            showingSavedScanFrom = saved.scannedAt
+            refreshRows()
+            await update(from: saved, eventID: eventID, journalID: journalID, generation: generation)
+        }
+    }
+
+    /// Re-reads only what changed since the result on screen was scanned.
+    func rescan() {
+        guard let lastScanPath else { return }
+        guard let tree, let baseScan, !isBusy else {
+            scan(lastScanPath)
+            return
+        }
+        scanGeneration += 1
+        let generation = scanGeneration
+        let base = CachedScan(tree: tree, scannedAt: baseScan.scannedAt, eventID: baseScan.eventID,
+                              journalID: baseScan.journalID)
+        isUpdating = true
+        Task {
+            await update(from: base, eventID: ChangeJournal.currentEventID(),
+                         journalID: ChangeJournal.journalID(for: lastScanPath), generation: generation)
+        }
+    }
+
+    func fullRescan() {
+        if let lastScanPath { scan(lastScanPath, full: true) }
+    }
+
+    var isBusy: Bool { isScanning || isUpdating }
+
+    private func resetForNewScan() {
         tree = nil
         current = 0
         selection = nil
@@ -111,18 +180,88 @@ final class AppModel {
         suggestions = []
         largeFiles = []
         lastUsed = [:]
-        volume = VolumeInfo(path: path)
+        comparison = nil
+        baseScan = nil
+        showingSavedScanFrom = nil
+        isUpdating = false
+    }
 
+    private func startFullScan(_ path: String, eventID: UInt64, journalID: String?,
+                               previous: (FileTree, Date)?, generation: Int) {
         let scanner = DiskScanner { [weak self] files in
             Task { @MainActor in self?.reportProgress(files, path: path, generation: generation) }
         }
         self.scanner = scanner
         Task.detached(priority: .userInitiated) {
             let result = Result { try scanner.scan(path) }
-            await self.finishScan(result, generation: generation)
+            await self.finishScan(result, eventID: eventID, journalID: journalID, previous: previous,
+                                  generation: generation)
         }
         snapshotTask = Task { [weak self] in
             await self?.followSnapshots(of: scanner, generation: generation)
+        }
+    }
+
+    /// Updates `base` from the change journal (or rescans fully if the journal
+    /// cannot tell), then swaps the result in and compares it with `base`.
+    private func update(from base: CachedScan, eventID: UInt64, journalID: String?, generation: Int) async {
+        let path = base.tree.rootPath
+        let result = await Task.detached(priority: .userInitiated) { () -> Result<FileTree, Error> in
+            Result {
+                if base.journalID != nil, base.journalID == journalID,
+                   let changes = ChangeJournal.changes(under: path, since: base.eventID) {
+                    return try TreeUpdater.update(base.tree, applying: changes)
+                }
+                return try DiskScanner().scan(path)
+            }
+        }.value
+        guard generation == scanGeneration else { return }
+        isUpdating = false
+        showingSavedScanFrom = nil
+        switch result {
+        case let .success(updated):
+            adopt(updated)
+            phase = .ready
+            remember(updated, eventID: eventID, journalID: journalID)
+            compare(base.tree, from: base.scannedAt, with: updated)
+        case let .failure(error):
+            alertMessage = "没能更新扫描结果：\(error)"
+        }
+    }
+
+    /// Shows `newTree` in place of the current one, finding the folder being
+    /// viewed, the selection and the basket again by path (ids change).
+    private func adopt(_ newTree: FileTree) {
+        let old = tree
+        let currentPath = old.map { $0.path(of: current) }
+        let selectionPath = selection.flatMap { node in old.map { $0.path(of: node) } }
+        let basketPaths = basket.compactMap { node in old.map { $0.path(of: node) } }
+        tree = newTree
+        treeVersion += 1
+        current = currentPath.flatMap(newTree.node(atPath:)) ?? 0
+        selection = selectionPath.flatMap(newTree.node(atPath:))
+        basket = basketPaths.compactMap(newTree.node(atPath:))
+        refreshRows()
+        refreshSuggestions()
+        refreshLargeFiles()
+    }
+
+    /// Saves `tree` for next time and adds it to the scan history, off the main thread.
+    private func remember(_ tree: FileTree, eventID: UInt64, journalID: String?) {
+        let scannedAt = Date()
+        baseScan = (scannedAt, eventID, journalID)
+        Task.detached(priority: .utility) {
+            try? Self.cache.save(CachedScan(tree: tree, scannedAt: scannedAt, eventID: eventID, journalID: journalID))
+            try? Self.history.record(tree, at: scannedAt)
+        }
+    }
+
+    private func compare(_ previous: FileTree, from date: Date, with current: FileTree) {
+        Task {
+            let result = await Task.detached(priority: .utility) {
+                ScanComparison(previous: previous, previousDate: date, current: current)
+            }.value
+            if self.tree?.rootPath == current.rootPath { comparison = result }
         }
     }
 
@@ -147,16 +286,13 @@ final class AppModel {
         }
     }
 
-    func rescan() {
-        if let lastScanPath { scan(lastScanPath) }
-    }
-
     func cancelScan() {
         scanner?.cancel()
         scanner = nil
         snapshotTask?.cancel()
         snapshotTask = nil
         scanGeneration += 1
+        isUpdating = false
         if isScanning {
             phase = .idle
             tree = nil
@@ -182,7 +318,8 @@ final class AppModel {
         phase = .scanning(path: path, files: files)
     }
 
-    private func finishScan(_ result: Result<FileTree, Error>, generation: Int) {
+    private func finishScan(_ result: Result<FileTree, Error>, eventID: UInt64, journalID: String?,
+                            previous: (FileTree, Date)?, generation: Int) {
         guard generation == scanGeneration else { return }
         scanner = nil
         snapshotTask?.cancel()
@@ -197,6 +334,8 @@ final class AppModel {
             refreshRows()
             refreshSuggestions()
             refreshLargeFiles()
+            remember(tree, eventID: eventID, journalID: journalID)
+            if let (previousTree, date) = previous { compare(previousTree, from: date, with: tree) }
             // The snapshots are gone; hand their freed pages back to the system now
             // instead of whenever memory gets tight.
             Task.detached(priority: .background) {
@@ -376,6 +515,15 @@ final class AppModel {
         return name
     }
 
+    /// Shows the item at `path` in the overview: its folder opened, the item selected.
+    func reveal(path: String) {
+        guard let tree, let node = tree.node(atPath: path) else { return }
+        section = .overview
+        current = node == 0 ? 0 : Int(tree.parents[node])
+        refreshRows()
+        selection = node == 0 ? nil : node
+    }
+
     func addToBasket(_ items: [CleanupItem]) {
         items.forEach { addToBasket($0.node) }
     }
@@ -410,7 +558,7 @@ final class AppModel {
 
     /// Moves every basket item to the Trash and takes it out of the tree.
     func trashBasket() {
-        guard !isScanning, var tree else { return }
+        guard !isBusy, var tree else { return }
         var failures: [String] = []
         for node in basket {
             let url = URL(fileURLWithPath: tree.path(of: node))

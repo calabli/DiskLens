@@ -64,8 +64,8 @@ private struct MainToolbar: ToolbarContent {
             }
             .help("选择要扫描的位置")
             Button { model.rescan() } label: { Label("重新扫描", systemImage: "arrow.clockwise") }
-                .disabled(model.tree == nil)
-                .help("重新扫描（⌘R）")
+                .disabled(model.tree == nil || model.isBusy)
+                .help("只重新读取改动过的文件夹（⌘R）；完整重新扫描用 ⇧⌘R")
         }
     }
 }
@@ -163,6 +163,8 @@ struct BrowserView: View {
                 Spacer(minLength: 8)
                 if case let .scanning(_, files) = model.phase {
                     ScanStatus(files: files)
+                } else if model.isUpdating {
+                    UpdateStatus(savedAt: model.showingSavedScanFrom)
                 } else if let volume = model.volume {
                     VolumeBar(volume: volume)
                 }
@@ -201,6 +203,9 @@ struct MainSplitView: View {
                     .tag(AppModel.Section.cleanup)
                 Label("大文件", systemImage: "doc.text.magnifyingglass")
                     .tag(AppModel.Section.largeFiles)
+                Label("变化", systemImage: "clock.arrow.circlepath")
+                    .badge(model.comparison.map { Text($0.delta.signedBytes) })
+                    .tag(AppModel.Section.changes)
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
         } detail: {
@@ -212,6 +217,8 @@ struct MainSplitView: View {
                     SuggestionsView()
                 case .largeFiles:
                     LargeFilesView()
+                case .changes:
+                    ChangesView()
                 }
                 Divider()
                 BasketBar()
@@ -277,6 +284,28 @@ private struct ScanStatus: View {
                 .controlSize(.small)
                 .keyboardShortcut(.cancelAction)
         }
+    }
+}
+
+/// Shown while a saved or current result is brought up to date.
+private struct UpdateStatus: View {
+    let savedAt: Date?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Group {
+                if let savedAt {
+                    Text("正在更新 · 显示的是 \(savedAt, format: .relative(presentation: .named))的结果")
+                } else {
+                    Text("正在更新…")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .help("只重新读取上次扫描后改动过的文件夹")
     }
 }
 
