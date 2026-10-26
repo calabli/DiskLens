@@ -48,6 +48,7 @@ PLIST
 
 # Resources of the core library, such as the cleanup rules (found through Bundle.module).
 cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
+cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -62,6 +63,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>app.disklens.DiskLens</string>
     <key>CFBundleExecutable</key>
     <string>DiskLens</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
