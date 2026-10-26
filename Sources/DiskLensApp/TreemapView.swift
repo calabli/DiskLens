@@ -2,11 +2,30 @@ import DiskLensCore
 import SwiftUI
 
 struct TreemapPane: View {
+    enum Style: String {
+        case treemap, sunburst
+    }
+
+    @AppStorage("map.style") private var style = Style.treemap
+
     var body: some View {
         VStack(spacing: 0) {
-            TreemapView()
+            switch style {
+            case .treemap: TreemapView()
+            case .sunburst: SunburstView()
+            }
             Divider()
-            Legend()
+            HStack(spacing: 0) {
+                Legend()
+                Picker("图表", selection: $style) {
+                    Image(systemName: "square.grid.2x2").help("方块图").tag(Style.treemap)
+                    Image(systemName: "circle.circle").help("环形图").tag(Style.sunburst)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .padding(.trailing, 8)
+            }
         }
     }
 }
@@ -123,7 +142,7 @@ struct TreemapView: View {
                         .opacity(transition == nil ? 1 : 0)
                         .animation(.smooth(duration: 0.18), value: transition == nil)
                     if tooltipShown, let hovered, hovered < items.count, transition == nil {
-                        Tooltip(item: items[hovered], tree: tree)
+                        NodeTooltip(node: Int(items[hovered].node), category: items[hovered].category, tree: tree)
                             .fixedSize()
                             .position(tooltipPosition(in: geo.size))
                             .allowsHitTesting(false)
@@ -444,16 +463,17 @@ private struct SelectionRing: View {
     }
 }
 
-private struct Tooltip: View {
-    let item: TreemapItem
+/// Name, size and place of the item under the pointer, in the treemap and the sunburst.
+struct NodeTooltip: View {
+    let node: Int
+    let category: FileCategory
     let tree: FileTree
 
     var body: some View {
-        let node = Int(item.node)
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                Image(systemName: item.category.symbol)
-                    .foregroundStyle(item.category.color)
+                Image(systemName: category.symbol)
+                    .foregroundStyle(category.color)
                 Text(tree.names[node])
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -478,10 +498,10 @@ private struct Tooltip: View {
 
     private func detail(_ node: Int) -> String {
         var parts = [ByteFormat.string(tree.totalSizes[node])]
-        if tree.kinds[node] == .directory && !item.category.isOpaqueBundle {
+        if tree.kinds[node] == .directory && !category.isOpaqueBundle {
             parts.append("\(tree.fileCounts[node].formatted()) 个文件")
         } else {
-            parts.append(item.category.label)
+            parts.append(category.label)
         }
         return parts.joined(separator: " · ")
     }

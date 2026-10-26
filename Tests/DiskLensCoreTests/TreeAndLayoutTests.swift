@@ -89,3 +89,44 @@ private func sampleTree() -> FileTree {
     #expect(items[1].depth == 2 && items[1].isLeaf)
     #expect(a.rect.contains(items[1].rect))
 }
+
+/// root → movies (dir) → trip.mov (600), notes.txt (100); root → b.zip (300); root → tiny (5).
+private func sunburstTree() -> FileTree {
+    FileTree(rootPath: "/r",
+             names: ["/r", "movies", "b.zip", "tiny", "trip.mov", "notes.txt"],
+             parents: [-1, 0, 0, 0, 1, 1],
+             kinds: [.directory, .directory, .file, .file, .file, .file],
+             ownSizes: [0, 0, 300, 5, 600, 100],
+             modTimes: [0, 0, 0, 0, 0, 0],
+             stats: ScanStats())
+}
+
+@Test func sunburstArcsAreProportionalAndNested() throws {
+    var options = SunburstOptions()
+    options.minSpan = 0.01
+    let segments = SunburstLayout.layout(sunburstTree(), root: 0, options: options)
+    let byNode = Dictionary(segments.filter { !$0.isRemainder }.map { (Int($0.node), $0) }, uniquingKeysWith: { a, _ in a })
+
+    let movies = try #require(byNode[1])
+    #expect(movies.depth == 1 && movies.start == 0 && abs(movies.end - 700.0 / 1005) < 1e-9)
+    #expect(movies.opensUp && movies.tint == .video)  // its largest file is a video
+    let zip = try #require(byNode[2])
+    #expect(abs(zip.start - movies.end) < 1e-9 && !zip.opensUp && zip.tint == .archive)
+
+    // The folder's files sit on the next ring, inside its arc.
+    let trip = try #require(byNode[4])
+    let notes = try #require(byNode[5])
+    #expect(trip.depth == 2 && trip.start == movies.start && abs(notes.end - movies.end) < 1e-9)
+
+    // "tiny" is under 1% of the turn: folded into a remainder arc that closes the ring.
+    #expect(byNode[3] == nil)
+    let remainder = try #require(segments.first { $0.isRemainder })
+    #expect(remainder.node == 0 && remainder.depth == 1 && remainder.end == 1)
+}
+
+@Test func sunburstStopsAtTheDepthLimit() {
+    var options = SunburstOptions()
+    options.maxDepth = 1
+    let segments = SunburstLayout.layout(sunburstTree(), root: 0, options: options)
+    #expect(segments.allSatisfy { $0.depth == 1 })
+}
