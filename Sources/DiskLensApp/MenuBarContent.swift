@@ -135,6 +135,8 @@ private struct UsageBar: View {
 /// DiskLens › Settings (⌘,).
 struct SettingsView: View {
     @Environment(AccessModel.self) private var access
+    @Environment(RuleLibrary.self) private var rules
+    @AppStorage(RuleLibrary.Keys.autoUpdate) private var autoUpdateRules = true
     @AppStorage(SpaceMonitor.Keys.menuBar) private var menuBar = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceAlerts) private var lowSpaceAlerts = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceThreshold) private var threshold = 20
@@ -167,6 +169,23 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("清理规则") {
+                LabeledContent("当前版本") {
+                    Text(rules.set.map { "第 \($0.version) 版 · \($0.rules.count) 条规则" } ?? "没能加载")
+                }
+                Toggle("自动更新清理规则", isOn: $autoUpdateRules)
+                HStack {
+                    Text(ruleStatus)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("立即检查") { rules.check() }
+                        .disabled(rules.status == .checking)
+                }
+                Text("每天最多检查一次，只下载公开的规则文件，不发送任何关于这台 Mac 的信息。规则带有签名，被改动过的不会采用。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("提醒") {
                 Toggle("可用空间不足时提醒", isOn: $lowSpaceAlerts)
                 Picker("低于", selection: $threshold) {
@@ -183,8 +202,22 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
+        .frame(width: 440)
         .onChange(of: lowSpaceAlerts) { if lowSpaceAlerts { SpaceMonitor.requestNotificationPermission() } }
         .onChange(of: growthAlerts) { if growthAlerts { SpaceMonitor.requestNotificationPermission() } }
+    }
+}
+
+private extension SettingsView {
+    var ruleStatus: String {
+        switch rules.status {
+        case .checking: return "正在检查…"
+        case let .updated(version): return "已更新到第 \(version) 版"
+        case .upToDate: return "已是最新"
+        case let .failed(reason): return reason
+        case .idle:
+            guard let last = rules.lastCheck else { return "还没有检查过" }
+            return "上次检查：" + last.formatted(.relative(presentation: .named))
+        }
     }
 }

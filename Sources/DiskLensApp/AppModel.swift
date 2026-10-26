@@ -119,7 +119,7 @@ final class AppModel {
     private(set) var lastUsed: [Int: Date] = [:]
     @ObservationIgnored private var installedApps: InstalledApps?
     @ObservationIgnored private var appNames: [String: String] = [:]
-    static let rules = Result { try CleanupRuleSet.bundled().rules }
+    let rules = RuleLibrary()
 
     private var scanner: DiskScanner?
     private var snapshotTask: Task<Void, Never>?
@@ -534,7 +534,7 @@ final class AppModel {
         let version = treeVersion
         isAnalyzing = true
         Task {
-            let rules = (try? Self.rules.get()) ?? []
+            let rules = rules.set?.rules ?? []
             let installed: InstalledApps
             if let installedApps {
                 installed = installedApps

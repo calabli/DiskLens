@@ -29,6 +29,8 @@ struct DiskLensApp: App {
                 .task {
                     monitor.start()
                     trashWatcher.start()
+                    model.rules.onUpdate = { [weak model] in model?.refreshSuggestions() }
+                    model.rules.checkIfDue()
                 }
                 .task {
                     // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes|unreadable` opens
@@ -92,6 +94,7 @@ struct DiskLensApp: App {
         Settings {
             SettingsView()
                 .environment(access)
+                .environment(model.rules)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

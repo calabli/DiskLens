@@ -15,9 +15,9 @@ struct SuggestionsView: View {
             } else if model.isAnalyzing && model.suggestions.isEmpty {
                 ProgressView("正在分析…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if case let .failure(error) = AppModel.rules {
+            } else if let error = model.rules.loadError {
                 ContentUnavailableView("清理规则没能加载", systemImage: "exclamationmark.triangle",
-                                       description: Text(error.localizedDescription))
+                                       description: Text(error))
             } else if model.suggestions.isEmpty {
                 ContentUnavailableView("没有发现可以清理的内容", systemImage: "checkmark.seal",
                                        description: Text("扫描范围内没有匹配的规则。扫描主目录能得到更完整的建议。"))

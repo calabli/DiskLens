@@ -14,7 +14,13 @@ let usage = """
       --duplicates   list files with identical contents (1 MB and larger, outside ~/Library)
       --use-cache    update the saved scan from the change journal instead of rescanning,
                      then print what changed and save the new result
+
+    disklens rules keygen|sign …   sign cleanup rules for publishing (see `disklens rules`)
     """
+
+if CommandLine.arguments.dropFirst().first == "rules" {
+    exit(RulesCommand.run(Array(CommandLine.arguments.dropFirst(2))))
+}
 
 var path: String?
 var top = 15
