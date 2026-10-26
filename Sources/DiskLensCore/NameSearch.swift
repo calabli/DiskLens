@@ -26,7 +26,7 @@ public enum NameSearch {
     /// Items whose name contains `query`, ignoring case, largest first.
     /// Returns nil if the task is cancelled while searching.
     public static func find(_ query: String, in tree: FileTree, limit: Int = 500,
-                            homePath: String = NSHomeDirectory()) -> NameSearchResult? {
+                            homePath: String = UserHome.path) -> NameSearchResult? {
         let query = query.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty, tree.count > 1 else { return NameSearchResult(matches: [], total: 0) }
 

@@ -1,4 +1,5 @@
 import AppKit
+import DiskLensCore
 import SwiftUI
 
 @main
@@ -27,6 +28,13 @@ struct DiskLensApp: App {
                 .environment(trashWatcher)
                 .frame(minWidth: 960, minHeight: 600)
                 .task {
+                    if UserHome.demoPath != nil {
+                        // Screenshots: the same window size every time, dark unless asked otherwise.
+                        if ProcessInfo.processInfo.environment["DISKLENS_DEMO_LIGHT"] == nil {
+                            NSApp.appearance = NSAppearance(named: .darkAqua)
+                        }
+                        NSApp.windows.first { $0.isVisible }?.setFrame(NSRect(x: 60, y: 60, width: 1440, height: 900), display: true)
+                    }
                     monitor.start()
                     trashWatcher.start()
                     model.rules.onUpdate = { [weak model] in model?.refreshSuggestions() }

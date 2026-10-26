@@ -10,7 +10,7 @@ struct DuplicatesView: View {
     /// The copy to keep per group, when the user picked a different one.
     @State private var keepers: [String: Int] = [:]
 
-    private static let homeLibrary = NSHomeDirectory() + "/Library/"
+    private static let homeLibrary = UserHome.path + "/Library/"
 
     var body: some View {
         if model.isScanning || model.isUpdating {
@@ -253,7 +253,7 @@ private struct FileRow: View {
                     .font(.caption)
                     .frame(width: 64, alignment: .leading)
             }
-            Text((file.path as NSString).abbreviatingWithTildeInPath)
+            Text(file.path.abbreviatingHome)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .opacity(inBasket ? 0.45 : 1)

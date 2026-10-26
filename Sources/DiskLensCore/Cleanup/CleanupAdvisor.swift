@@ -20,7 +20,7 @@ public struct CleanupAdvisor: Sendable {
     /// Whether a bundle identifier belongs to an app that is still installed.
     public var isAppInstalled: @Sendable (String) -> Bool
 
-    public init(homePath: String = NSHomeDirectory(), now: Date = Date(),
+    public init(homePath: String = UserHome.path, now: Date = Date(),
                 isAppInstalled: @escaping @Sendable (String) -> Bool) {
         self.homePath = homePath.hasSuffix("/") ? String(homePath.dropLast()) : homePath
         self.now = now

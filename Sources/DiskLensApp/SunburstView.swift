@@ -322,7 +322,7 @@ private struct CenterLabel: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(isHovered ? Color.accentColor : .secondary)
             }
-            Text(node == 0 ? (tree.rootPath as NSString).abbreviatingWithTildeInPath : tree.names[node])
+            Text(node == 0 ? tree.rootPath.abbreviatingHome : tree.names[node])
                 .font(.callout.weight(.semibold))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)

@@ -270,7 +270,7 @@ private struct OwnerRow: View {
         DisclosureGroup(isExpanded: $expanded) {
             ForEach(folders, id: \.folder) { folder in
                 HStack {
-                    Text((folder.folder as NSString).abbreviatingWithTildeInPath)
+                    Text(folder.folder.abbreviatingHome)
                         .font(.caption)
                         .lineLimit(1)
                         .truncationMode(.middle)

@@ -16,7 +16,7 @@ public struct InstalledApps: Sendable {
 
     /// Reads the bundle identifier of every app in /Applications, ~/Applications
     /// and the system app folders, two folders deep.
-    public static func discover(homePath: String = NSHomeDirectory()) -> InstalledApps {
+    public static func discover(homePath: String = UserHome.path) -> InstalledApps {
         let roots = ["/Applications", homePath + "/Applications", "/System/Applications",
                      "/System/Applications/Utilities", "/System/Library/CoreServices"]
         var found: [String] = []

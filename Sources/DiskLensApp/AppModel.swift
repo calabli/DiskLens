@@ -33,6 +33,11 @@ struct VolumeInfo: Equatable {
     var used: Int64 { max(total - availableForImportantUsage, 0) }
 
     init?(path: String) {
+        if UserHome.demoPath != nil {
+            // A made-up 1 TB disk, so screenshots show nothing of the real one.
+            (name, total, available, availableForImportantUsage) = ("Macintosh HD", 994_000_000_000, 312_000_000_000, 358_000_000_000)
+            return
+        }
         let keys: Set<URLResourceKey> = [.volumeLocalizedNameKey, .volumeTotalCapacityKey,
                                          .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys),
@@ -54,7 +59,7 @@ final class AppModel {
         case failed(String)
     }
 
-    static let homePath = NSHomeDirectory()
+    static let homePath = UserHome.path
     /// The data volume holds everything users and apps write; scanning "/" would stop at its firmlinks.
     static let wholeDiskPath = "/System/Volumes/Data"
 
@@ -577,6 +582,8 @@ final class AppModel {
     }
 
     func refreshRunningApps() {
+        // In a demo, which apps happen to be open on this Mac is nobody's business.
+        guard UserHome.demoPath == nil else { return }
         runningAppIDs = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier?.lowercased() })
     }
 

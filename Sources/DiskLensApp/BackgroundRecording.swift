@@ -1,3 +1,4 @@
+import DiskLensCore
 import Observation
 import ServiceManagement
 
@@ -15,7 +16,8 @@ final class BackgroundRecording {
     var isOn: Bool { status == .enabled || status == .requiresApproval }
 
     func refresh() {
-        status = service.status
+        // A demo shows recording as on, whatever this Mac's own setting is.
+        status = UserHome.demoPath != nil ? .enabled : service.status
     }
 
     func setOn(_ on: Bool) {

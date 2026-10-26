@@ -36,7 +36,7 @@ struct ContentView: View {
             }
         }
         .toolbar { MainToolbar() }
-        .navigationTitle(model.tree.map { ($0.rootPath as NSString).abbreviatingWithTildeInPath } ?? "DiskLens")
+        .navigationTitle(model.tree.map { $0.rootPath.abbreviatingHome } ?? "DiskLens")
         .quickLookPreview($model.previewURL)
         .sheet(isPresented: Binding(get: { model.showUnreadable && !access.showGuide },
                                     set: { model.showUnreadable = $0 })) {
@@ -169,7 +169,7 @@ struct ScanningView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .controlSize(.large)
-            Text("正在扫描 \((path as NSString).abbreviatingWithTildeInPath)")
+            Text("正在扫描 \(path.abbreviatingHome)")
                 .font(.headline)
             Text("已发现 \(files.formatted()) 个文件")
                 .monospacedDigit()
@@ -320,7 +320,7 @@ private struct Breadcrumb: View {
                         Button {
                             model.goTo(node)
                         } label: {
-                            Text(node == 0 ? (tree.rootPath as NSString).abbreviatingWithTildeInPath : tree.names[node])
+                            Text(node == 0 ? tree.rootPath.abbreviatingHome : tree.names[node])
                                 .fontWeight(isLast ? .semibold : .regular)
                                 .foregroundStyle(isLast ? .primary : .secondary)
                         }

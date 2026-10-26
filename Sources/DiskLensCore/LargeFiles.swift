@@ -20,7 +20,7 @@ public enum LargeFileFinder {
     /// photo libraries and disk-image bundles are left out: deleting one of
     /// them breaks the bundle, so the bundle as a whole is listed instead.
     public static func find(in tree: FileTree, minimumSize: Int64, limit: Int = 2_000,
-                            homePath: String = NSHomeDirectory()) -> [LargeFile] {
+                            homePath: String = UserHome.path) -> [LargeFile] {
         var candidates: [Int] = []
         for node in 1..<max(tree.count, 1) where tree.totalSizes[node] >= minimumSize {
             switch tree.kinds[node] {

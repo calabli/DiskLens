@@ -10,5 +10,7 @@ mkdir -p docs
   cat promo/site/disklens.html
   printf '\n</body>\n</html>\n'
 } > docs/index.html
+rm -rf docs/img
+cp -R promo/site/img docs/img
 touch docs/.nojekyll
 echo "wrote docs/index.html"

@@ -77,7 +77,7 @@ public struct AppFootprintFinder: Sendable {
     public var systemLibrary = "/Library"
     public var includeInstallerReceipts = true
 
-    public init(homePath: String = NSHomeDirectory(), installed: [InstalledApp]) {
+    public init(homePath: String = UserHome.path, installed: [InstalledApp]) {
         self.homePath = homePath.hasSuffix("/") ? String(homePath.dropLast()) : homePath
         self.installed = installed
     }

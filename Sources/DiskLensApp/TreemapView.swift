@@ -549,7 +549,7 @@ struct NodeTooltip: View {
 
     private func relativePath(_ node: Int) -> String {
         let full = tree.path(of: node)
-        return (full as NSString).abbreviatingWithTildeInPath
+        return full.abbreviatingHome
     }
 }
 

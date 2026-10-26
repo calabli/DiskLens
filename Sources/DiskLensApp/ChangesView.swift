@@ -111,7 +111,7 @@ private struct ChangeRow: View {
 
     private var displayFolder: String {
         let folder = (change.path as NSString).deletingLastPathComponent
-        return (folder as NSString).abbreviatingWithTildeInPath
+        return folder.abbreviatingHome
     }
 }
 

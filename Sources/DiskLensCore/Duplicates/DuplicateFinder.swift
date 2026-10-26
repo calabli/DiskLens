@@ -50,7 +50,7 @@ public final class DuplicateFinder: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
 
-    public init(homePath: String = NSHomeDirectory()) {
+    public init(homePath: String = UserHome.path) {
         self.homePath = homePath.hasSuffix("/") ? String(homePath.dropLast()) : homePath
     }
 

@@ -62,7 +62,7 @@ public struct CleanupLog: Sendable {
 
     /// ~/Library/Application Support/<bundle id>/cleanup-log.json.
     public static var standard: CleanupLog {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let support = UserHome.directory(.applicationSupportDirectory)
         let id = Bundle.main.bundleIdentifier ?? "app.disklens.DiskLens"
         return CleanupLog(file: support.appendingPathComponent(id).appendingPathComponent("cleanup-log.json"))
     }

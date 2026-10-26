@@ -147,7 +147,7 @@ private struct FolderLine: View {
                 .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).lineLimit(1).truncationMode(.middle)
-                Text((parent as NSString).abbreviatingWithTildeInPath)
+                Text(parent.abbreviatingHome)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

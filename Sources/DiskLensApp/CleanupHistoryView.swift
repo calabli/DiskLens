@@ -70,7 +70,7 @@ private struct ItemRow: View {
                 Text(item.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(((item.originalPath as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)
+                Text((item.originalPath as NSString).deletingLastPathComponent.abbreviatingHome)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

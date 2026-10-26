@@ -329,7 +329,7 @@ private struct AppDetail: View {
                     }
                 }
                 Text(file.path.hasPrefix("pkg:") ? file.reason
-                     : "\(file.reason) · \(((file.path as NSString).deletingLastPathComponent as NSString).abbreviatingWithTildeInPath)")
+                     : "\(file.reason) · \((file.path as NSString).deletingLastPathComponent.abbreviatingHome)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

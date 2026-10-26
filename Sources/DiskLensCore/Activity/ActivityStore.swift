@@ -27,7 +27,7 @@ public final class ActivityStore: @unchecked Sendable {
 
     /// ~/Library/Application Support/<bundle id>/activity.sqlite
     public static var defaultURL: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let support = UserHome.directory(.applicationSupportDirectory)
         return support.appendingPathComponent("app.disklens.DiskLens").appendingPathComponent("activity.sqlite")
     }
 

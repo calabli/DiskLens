@@ -67,7 +67,7 @@ public struct InstalledApp: Sendable, Identifiable, Hashable {
 
 /// The apps installed in the usual places.
 public enum AppCatalog {
-    public static func installedApps(homePath: String = NSHomeDirectory()) -> [InstalledApp] {
+    public static func installedApps(homePath: String = UserHome.path) -> [InstalledApp] {
         let roots = ["/Applications", homePath + "/Applications"]
         var apps: [InstalledApp] = []
         var seen = Set<String>()

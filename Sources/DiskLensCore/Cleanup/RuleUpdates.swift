@@ -113,7 +113,7 @@ public struct RuleStore: Sendable {
 
     /// ~/Library/Application Support/<bundle id>/Rules.
     public static var standard: RuleStore {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let support = UserHome.directory(.applicationSupportDirectory)
         let id = Bundle.main.bundleIdentifier ?? "app.disklens.DiskLens"
         return RuleStore(directory: support.appendingPathComponent(id).appendingPathComponent("Rules"))
     }

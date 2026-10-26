@@ -35,7 +35,7 @@ public struct ScanCache: Sendable {
 
     /// ~/Library/Caches/<bundle id>/Scans, or a DiskLens folder outside an app bundle.
     public static var standard: ScanCache {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let caches = UserHome.directory(.cachesDirectory)
         let id = Bundle.main.bundleIdentifier ?? "app.disklens.DiskLens"
         return ScanCache(directory: caches.appendingPathComponent(id).appendingPathComponent("Scans"))
     }
