@@ -34,12 +34,9 @@ public enum LargeFileFinder {
         }
         candidates.sort { tree.totalSizes[$0] > tree.totalSizes[$1] }
 
-        let home = homePath.hasSuffix("/") ? String(homePath.dropLast()) : homePath
         var result: [LargeFile] = []
         for node in candidates where !isInsideBundle(node, in: tree) && !tree.isRemoved(node) {
-            let parentPath = logicalPath(tree.path(of: Int(tree.parents[node])))
-            let location = parentPath == home || parentPath.hasPrefix(home + "/")
-                ? "~" + parentPath.dropFirst(home.count) : parentPath
+            let location = location(of: node, in: tree, homePath: homePath)
             result.append(LargeFile(
                 node: node, name: tree.names[node], size: tree.totalSizes[node],
                 category: FileCategory.of(name: tree.names[node], kind: tree.kinds[node]),
@@ -58,6 +55,15 @@ public enum LargeFileFinder {
             i = Int(tree.parents[i])
         }
         return false
+    }
+
+    /// The folder `node` is in, as people know it: the home folder as `~`,
+    /// without the data volume's /System/Volumes/Data prefix.
+    static func location(of node: Int, in tree: FileTree, homePath: String) -> String {
+        let home = homePath.hasSuffix("/") ? String(homePath.dropLast()) : homePath
+        let parentPath = logicalPath(tree.path(of: Int(tree.parents[node])))
+        return parentPath == home || parentPath.hasPrefix(home + "/")
+            ? "~" + parentPath.dropFirst(home.count) : parentPath
     }
 
     private static func logicalPath(_ path: String) -> String {

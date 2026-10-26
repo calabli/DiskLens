@@ -56,6 +56,10 @@ struct DiskLensApp: App {
                         default: break
                         }
                     }
+                    if let i = args.firstIndex(of: "--search"), i + 1 < args.count {
+                        while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
+                        model.searchText = args[i + 1]
+                    }
                     if let i = args.firstIndex(of: "--select-app"), i + 1 < args.count {
                         while uninstaller.apps.isEmpty { try? await Task.sleep(for: .milliseconds(200)) }
                         uninstaller.selection = uninstaller.apps.first { $0.name.localizedCaseInsensitiveContains(args[i + 1]) }?.path

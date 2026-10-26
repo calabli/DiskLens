@@ -186,6 +186,7 @@ struct BrowserView: View {
     let tree: FileTree
 
     var body: some View {
+        @Bindable var model = model
         VStack(spacing: 0) {
             HStack(spacing: 16) {
                 Breadcrumb()
@@ -206,12 +207,19 @@ struct BrowserView: View {
                 Divider()
             }
             HSplitView {
-                FolderTable()
-                    .frame(minWidth: 340, idealWidth: 460)
+                Group {
+                    if model.isSearchActive {
+                        SearchResultsView()
+                    } else {
+                        FolderTable()
+                    }
+                }
+                .frame(minWidth: 340, idealWidth: 460)
                 TreemapPane()
                     .frame(minWidth: 380)
             }
         }
+        .searchable(text: $model.searchText, placement: .toolbar, prompt: "搜索文件名")
     }
 }
 

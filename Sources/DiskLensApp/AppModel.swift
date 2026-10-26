@@ -71,7 +71,9 @@ final class AppModel {
     private(set) var basket: [Int] = []
     private(set) var volume: VolumeInfo?
     /// Bumped whenever the tree changes, so views redo their layout.
-    private(set) var treeVersion = 0
+    private(set) var treeVersion = 0 {
+        didSet { if isSearchActive { scheduleSearch(after: .zero) } }
+    }
     /// Bumped when a different tree replaces the current one, which renumbers
     /// nodes; trashing items changes the tree in place and keeps node ids.
     private(set) var treeGeneration = 0
@@ -79,6 +81,13 @@ final class AppModel {
     var alertMessage: String?
     /// The list of folders the scan could not read is open.
     var showUnreadable = false
+    /// The overview's search field; while it holds text, matches replace the folder list.
+    var searchText = "" {
+        didSet { if searchText != oldValue { scheduleSearch() } }
+    }
+    private(set) var searchResult: NameSearchResult?
+    private(set) var isSearching = false
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var unreadableNodes: (version: Int, byNode: [Int: UnreadableFolder]) = (-1, [:])
 
     enum Section: Hashable {
@@ -479,6 +488,44 @@ final class AppModel {
         return unreadableNodes.byNode
     }
 
+    // MARK: Name search
+
+    var isSearchActive: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Searches the whole tree for `searchText` once typing pauses, replacing any search still running.
+    private func scheduleSearch(after delay: Duration = .milliseconds(180)) {
+        searchTask?.cancel()
+        guard isSearchActive, let tree else {
+            searchResult = nil
+            isSearching = false
+            return
+        }
+        let query = searchText
+        isSearching = true
+        searchTask = Task {
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled, let result = await Self.search(query, in: tree), !Task.isCancelled else { return }
+            searchResult = result
+            isSearching = false
+        }
+    }
+
+    /// Runs off the main actor, in the calling task, so cancelling that task stops the search.
+    nonisolated private static func search(_ query: String, in tree: FileTree) async -> NameSearchResult? {
+        NameSearch.find(query, in: tree)
+    }
+
+    /// Leaves the search and shows `node` in its place: a folder opened, a file selected in its folder.
+    func showSearchMatch(_ node: Int) {
+        searchText = ""
+        guard let tree else { return }
+        if tree.kinds[node] == .directory && !tree.children(of: node).isEmpty {
+            open(node)
+        } else {
+            reveal(node: node)
+        }
+    }
+
     // MARK: Cleanup suggestions
 
     /// Re-runs the advisor on the current tree, e.g. after a scan or after trashing.
@@ -548,7 +595,12 @@ final class AppModel {
 
     /// Shows the item at `path` in the overview: its folder opened, the item selected.
     func reveal(path: String) {
-        guard let tree, let node = tree.node(atPath: path) else { return }
+        guard let node = tree?.node(atPath: path) else { return }
+        reveal(node: node)
+    }
+
+    func reveal(node: Int) {
+        guard let tree else { return }
         section = .overview
         current = node == 0 ? 0 : Int(tree.parents[node])
         refreshRows()
