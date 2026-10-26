@@ -38,6 +38,12 @@ struct ContentView: View {
         .toolbar { MainToolbar() }
         .navigationTitle(model.tree.map { ($0.rootPath as NSString).abbreviatingWithTildeInPath } ?? "DiskLens")
         .quickLookPreview($model.previewURL)
+        .sheet(isPresented: Binding(get: { model.showUnreadable && !access.showGuide },
+                                    set: { model.showUnreadable = $0 })) {
+            UnreadableFoldersSheet()
+                .environment(model)
+                .environment(access)
+        }
         .sheet(isPresented: Binding(get: { access.showGuide }, set: { access.showGuide = $0 })) {
             FullDiskAccessGuide()
                 .environment(model)
@@ -403,6 +409,8 @@ private struct UnreadableBanner: View {
                  : "有 \(count) 个文件夹因为没有权限没能读取，结果可能偏小。")
                 .font(.callout)
             Spacer()
+            Button("查看文件夹") { model.showUnreadable = true }
+                .font(.callout)
             if access.isGranted {
                 Button("完整重新扫描") { model.fullRescan() }
                     .font(.callout)

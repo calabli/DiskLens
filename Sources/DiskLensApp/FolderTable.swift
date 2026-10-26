@@ -16,6 +16,12 @@ struct FolderTable: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .opacity(model.isInBasket(row.id) ? 0.45 : 1)
+                    if let folder = row.unreadable {
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .help("没能读取：\(folder.reason)。它的大小没有算进来。")
+                    }
                     if model.isInBasket(row.id) {
                         Image(systemName: "tray.full")
                             .font(.caption)

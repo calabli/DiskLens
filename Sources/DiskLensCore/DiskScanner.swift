@@ -283,8 +283,7 @@ private final class TreeBuilder: @unchecked Sendable {
         stats.directories += 1
         if error != 0 {
             if job.node == 0 { rootError = error }
-            stats.unreadableDirectories += 1
-            if stats.unreadableSamples.count < 20 { stats.unreadableSamples.append(job.path) }
+            stats.noteUnreadable(job.path, code: error)
         }
 
         let prefix = job.path.hasSuffix("/") ? job.path : job.path + "/"

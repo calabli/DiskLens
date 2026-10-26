@@ -20,10 +20,24 @@ public enum TreeUpdater {
         try update.visit(oldNode: 0, newNode: 0, path: old.rootPath)
 
         var stats = update.builder.stats
-        stats.unreadableDirectories += old.stats.unreadableDirectories
-        stats.unreadableSamples = Array((old.stats.unreadableSamples + stats.unreadableSamples).prefix(20))
+        stats.mergeUnreadable(from: old.stats, changes: changes)
         stats.duration = Date().timeIntervalSince(started)
         return update.builder.makeTree(rootPath: old.rootPath, stats: stats)
+    }
+}
+
+private extension ScanStats {
+    /// Carries over the folders the old scan could not read, except those read
+    /// again this time (they were noted afresh if still unreadable) and those gone.
+    mutating func mergeUnreadable(from old: ScanStats, changes: ChangeSet) {
+        func reread(_ path: String) -> Bool {
+            changes.folders.contains(path) || changes.subtrees.contains { path == $0 || path.hasPrefix($0 + "/") }
+        }
+        var st = stat()
+        let kept = old.unreadable.filter { !reread($0.path) && lstat($0.path, &st) == 0 }
+        // Old folders beyond the list's limit are unknown; assume they are still there.
+        unreadableDirectories += old.unreadableDirectories - (old.unreadable.count - kept.count)
+        unreadable = Array((kept + unreadable).prefix(Self.unreadableLimit))
     }
 }
 
@@ -65,12 +79,18 @@ private struct Update {
     /// Returns false if it cannot be read, so the caller keeps the old contents.
     private mutating func reread(_ path: String, oldNode: Int, newNode: Int32) -> Bool {
         let fd = open(path, DirectoryReader.openFlags)
-        guard fd >= 0 else { return false }
+        guard fd >= 0 else {
+            builder.stats.noteUnreadable(path, code: errno)
+            return false
+        }
         entries.removeAll(keepingCapacity: true)
         nameBytes.removeAll(keepingCapacity: true)
         let code = reader.read(directory: fd, into: &entries, names: &nameBytes)
         close(fd)
-        guard code == 0 else { return false }
+        guard code == 0 else {
+            builder.stats.noteUnreadable(path, code: code)
+            return false
+        }
 
         var oldFolders: [String: Int] = [:]
         for child in old.children(of: oldNode).map(Int.init) where old.kinds[child] == .directory {
@@ -100,14 +120,23 @@ private struct Update {
 
     /// Scans `path` from scratch and adds everything in it below `newNode`.
     private mutating func graftFreshScan(of path: String, under newNode: Int32) {
-        guard let fresh = try? DiskScanner(options: options).scan(path) else { return }
+        let fresh: FileTree
+        do {
+            fresh = try DiskScanner(options: options).scan(path)
+        } catch let ScanError.cannotRead(_, code) {
+            builder.stats.noteUnreadable(path, code: code)
+            return
+        } catch {
+            return
+        }
         var ids = [Int32](repeating: newNode, count: fresh.count)
         for node in 1..<max(fresh.count, 1) {
             ids[node] = builder.add(nameOf: node, in: fresh.names, parent: ids[Int(fresh.parents[node])],
                                     kind: fresh.kinds[node], ownSize: fresh.ownSizes[node],
                                     modTime: fresh.modTimes[node])
         }
-        builder.stats.unreadableDirectories += fresh.stats.unreadableDirectories
+        for folder in fresh.stats.unreadable { builder.stats.noteUnreadable(folder.path, code: folder.code) }
+        builder.stats.unreadableDirectories += fresh.stats.unreadableDirectories - fresh.stats.unreadable.count
         builder.stats.skippedMounts += fresh.stats.skippedMounts
     }
 

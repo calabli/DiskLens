@@ -1,3 +1,5 @@
+import Darwin
+
 /// The result of a scan, stored as parallel flat arrays indexed by node id
 /// instead of one object per file, so millions of entries stay compact.
 ///
@@ -173,10 +175,32 @@ public struct ScanStats: Sendable {
     public var directories = 0
     /// Directories that could not be read (usually missing Full Disk Access).
     public var unreadableDirectories = 0
-    public var unreadableSamples: [String] = []
+    /// Those directories and why, up to `unreadableLimit` of them.
+    public var unreadable: [UnreadableFolder] = []
+    public static let unreadableLimit = 5_000
+
+    mutating func noteUnreadable(_ path: String, code: Int32) {
+        unreadableDirectories += 1
+        if unreadable.count < Self.unreadableLimit { unreadable.append(UnreadableFolder(path: path, code: code)) }
+    }
     /// Directories skipped because they are on another volume.
     public var skippedMounts = 0
     /// Hard links not counted again because their inode was already seen.
     public var duplicateHardLinks = 0
     public var duration: Double = 0
+}
+
+/// A folder a scan could not list, with the `errno` it failed with.
+public struct UnreadableFolder: Sendable, Hashable {
+    public let path: String
+    public let code: Int32
+
+    public init(path: String, code: Int32) {
+        self.path = path
+        self.code = code
+    }
+
+    /// Kept out of reach by macOS privacy protection, which Full Disk Access lifts.
+    /// Folders that fail with EACCES belong to the system or another user instead.
+    public var needsFullDiskAccess: Bool { code == EPERM }
 }

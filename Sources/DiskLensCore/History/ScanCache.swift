@@ -27,7 +27,7 @@ public struct ScanCache: Sendable {
     public let directory: URL
 
     private static let magic: UInt32 = 0x4443_4C44  // "DLCD"
-    private static let version: UInt32 = 1
+    private static let version: UInt32 = 2
 
     public init(directory: URL) {
         self.directory = directory
@@ -62,6 +62,11 @@ public struct ScanCache: Sendable {
             writer.put(Int64(value))
         }
         writer.put(s.duration)
+        writer.put(UInt32(s.unreadable.count))
+        for folder in s.unreadable {
+            writer.put(folder.code)
+            writer.put(string: folder.path)
+        }
 
         // Removed nodes (trashed since the scan) are left out; ids are renumbered.
         var newID = [Int32](repeating: -1, count: tree.count)
@@ -102,10 +107,15 @@ public struct ScanCache: Sendable {
         guard let files = reader.get(Int64.self), let dirs = reader.get(Int64.self),
               let unreadable = reader.get(Int64.self), let mounts = reader.get(Int64.self),
               let links = reader.get(Int64.self), let duration = reader.get(Double.self),
-              let count64 = reader.get(UInt64.self)
+              let unreadableListed = reader.get(UInt32.self)
         else { return nil }
         (stats.files, stats.directories, stats.unreadableDirectories) = (Int(files), Int(dirs), Int(unreadable))
         (stats.skippedMounts, stats.duplicateHardLinks, stats.duration) = (Int(mounts), Int(links), duration)
+        for _ in 0..<unreadableListed {
+            guard let code = reader.get(Int32.self), let path = reader.getString() else { return nil }
+            stats.unreadable.append(UnreadableFolder(path: path, code: code))
+        }
+        guard let count64 = reader.get(UInt64.self) else { return nil }
 
         let count = Int(count64)
         var parents = ChunkedArray<Int32>()

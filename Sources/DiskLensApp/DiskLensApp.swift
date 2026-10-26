@@ -31,7 +31,7 @@ struct DiskLensApp: App {
                     trashWatcher.start()
                 }
                 .task {
-                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes` opens
+                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes|unreadable` opens
                     // that page, for development and scripting.
                     let args = CommandLine.arguments
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
@@ -50,6 +50,9 @@ struct DiskLensApp: App {
                         case "duplicates": model.section = .duplicates
                         case "storage": model.section = .storage
                         case "apps": model.section = .apps
+                        case "unreadable":
+                            while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
+                            model.showUnreadable = true
                         default: break
                         }
                     }

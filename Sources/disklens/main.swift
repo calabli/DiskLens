@@ -169,7 +169,7 @@ print("\(tree.rootPath)")
 print("Total \(ByteFormat.string(tree.totalSize))  ·  \(s.files) files  ·  \(s.directories) folders  ·  \(String(format: "%.2f", s.duration)) s")
 if s.unreadableDirectories > 0 {
     print("Could not read \(s.unreadableDirectories) folders (grant Full Disk Access to the terminal to include them), e.g.:")
-    for sample in s.unreadableSamples.prefix(3) { print("  \(sample)") }
+    for folder in s.unreadable.prefix(3) { print("  \(folder.path)") }
 }
 if s.skippedMounts > 0 { print("Skipped \(s.skippedMounts) folders on other volumes (use --all-volumes to include)") }
 if s.duplicateHardLinks > 0 { print("Counted \(s.duplicateHardLinks) hard links once") }

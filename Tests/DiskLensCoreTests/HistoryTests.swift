@@ -178,3 +178,31 @@ private func sizesByPath(_ tree: FileTree) -> [String: Int64] {
     #expect(entries.last?.date == Date(timeIntervalSince1970: 4 * 86_400))
     #expect(entries.allSatisfy { $0.totalSize == tree.totalSize })
 }
+
+@Test func unreadableFoldersAreListedCachedAndClearedOnceReadable() throws {
+    let folder = try Folder()
+    try folder.populate()
+    let locked = folder.path("keep")
+    chmod(locked, 0)
+    defer { chmod(locked, 0o755) }
+
+    let tree = try folder.scan()
+    #expect(tree.stats.unreadableDirectories == 1)
+    #expect(tree.stats.unreadable == [UnreadableFolder(path: locked, code: EACCES)])
+    #expect(tree.stats.unreadable.first?.needsFullDiskAccess == false)
+
+    let cache = ScanCache(directory: URL(fileURLWithPath: folder.root + "-cache"))
+    defer { try? FileManager.default.removeItem(at: cache.directory) }
+    try cache.save(CachedScan(tree: tree, scannedAt: Date(), eventID: 1, journalID: nil))
+    #expect(try #require(cache.load(rootPath: folder.root)).tree.stats.unreadable == tree.stats.unreadable)
+
+    // An update that does not touch the folder keeps it listed...
+    let untouched = try TreeUpdater.update(tree, applying: ChangeSet(folders: [folder.path("a")]))
+    #expect(untouched.stats.unreadable == tree.stats.unreadable && untouched.stats.unreadableDirectories == 1)
+
+    // ...and once it can be read and is read again, it is gone from the list.
+    chmod(locked, 0o755)
+    let opened = try TreeUpdater.update(tree, applying: ChangeSet(folders: [locked]))
+    #expect(opened.stats.unreadable.isEmpty && opened.stats.unreadableDirectories == 0)
+    #expect(opened.node(atPath: folder.path("keep/five.bin")) != nil)
+}

@@ -16,6 +16,8 @@ struct FolderRow: Identifiable, Sendable {
     let modified: Date
     let isDirectory: Bool
     let category: FileCategory
+    /// The scan could not list this folder, so its size is missing.
+    var unreadable: UnreadableFolder?
 }
 
 /// Space on the volume being scanned, as Finder reports it.
@@ -75,6 +77,9 @@ final class AppModel {
     private(set) var treeGeneration = 0
     var previewURL: URL?
     var alertMessage: String?
+    /// The list of folders the scan could not read is open.
+    var showUnreadable = false
+    @ObservationIgnored private var unreadableNodes: (version: Int, byNode: [Int: UnreadableFolder]) = (-1, [:])
 
     enum Section: Hashable {
         case overview
@@ -447,6 +452,7 @@ final class AppModel {
         }
         let total = max(Double(tree.totalSizes[current]), 1)
         let largest = max(Double(tree.children(of: current).first.map { tree.totalSizes[Int($0)] } ?? 1), 1)
+        let unreadable = unreadableFolders(in: tree)
         rows = tree.children(of: current).map { child in
             let c = Int(child)
             let size = tree.totalSizes[c]
@@ -455,9 +461,22 @@ final class AppModel {
                              files: tree.fileCounts[c],
                              modified: Date(timeIntervalSince1970: TimeInterval(tree.modTimes[c])),
                              isDirectory: tree.kinds[c] == .directory,
-                             category: FileCategory.of(name: tree.names[c], kind: tree.kinds[c]))
+                             category: FileCategory.of(name: tree.names[c], kind: tree.kinds[c]),
+                             unreadable: unreadable[c])
         }
         .sorted(using: sortOrder)
+    }
+
+    /// The unreadable folders of `tree` by node, worked out once per tree.
+    private func unreadableFolders(in tree: FileTree) -> [Int: UnreadableFolder] {
+        if unreadableNodes.version != treeVersion {
+            var byNode: [Int: UnreadableFolder] = [:]
+            for folder in tree.stats.unreadable {
+                if let node = tree.node(atPath: folder.path) { byNode[node] = folder }
+            }
+            unreadableNodes = (treeVersion, byNode)
+        }
+        return unreadableNodes.byNode
     }
 
     // MARK: Cleanup suggestions
