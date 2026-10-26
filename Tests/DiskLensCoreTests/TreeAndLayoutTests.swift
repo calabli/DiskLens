@@ -130,3 +130,30 @@ private func sunburstTree() -> FileTree {
     let segments = SunburstLayout.layout(sunburstTree(), root: 0, options: options)
     #expect(segments.allSatisfy { $0.depth == 1 })
 }
+
+@Test func tinyBlocksAreFoldedIntoOneOtherBlock() throws {
+    // One large file and fifty tiny ones in a 100×100 map.
+    let count = 52
+    var names: NamePool = ["/r", "big"]
+    var parents: ChunkedArray<Int32> = [-1, 0]
+    var kinds: ChunkedArray<EntryKind> = [.directory, .file]
+    var sizes: ChunkedArray<Int64> = [0, 10_000]
+    var times: ChunkedArray<Int64> = [0, 0]
+    for i in 2..<count {
+        names.append("tiny\(i)")
+        parents.append(0)
+        kinds.append(.file)
+        sizes.append(1)
+        times.append(0)
+    }
+    let tree = FileTree(rootPath: "/r", names: names, parents: parents, kinds: kinds,
+                        ownSizes: sizes, modTimes: times, stats: ScanStats())
+
+    let items = TreemapLayout.layout(tree, root: 0, in: CGRect(x: 0, y: 0, width: 100, height: 100))
+    let other = try #require(items.first { $0.isOther })
+    #expect(other.otherCount == 50 && other.otherSize == 50 && other.node == 0)
+    #expect(items.filter { !$0.isOther }.map { tree.names[Int($0.node)] } == ["big"])
+    // Together the blocks still cover the whole map.
+    let area = items.reduce(0) { $0 + $1.rect.width * $1.rect.height }
+    #expect(abs(area - 10_000) < 1)
+}

@@ -142,7 +142,13 @@ struct TreemapView: View {
                         .opacity(transition == nil ? 1 : 0)
                         .animation(.smooth(duration: 0.18), value: transition == nil)
                     if tooltipShown, let hovered, hovered < items.count, transition == nil {
-                        NodeTooltip(node: Int(items[hovered].node), category: items[hovered].category, tree: tree)
+                        Group {
+                            if items[hovered].isOther {
+                                OtherTooltip(count: items[hovered].otherCount, size: items[hovered].otherSize)
+                            } else {
+                                NodeTooltip(node: Int(items[hovered].node), category: items[hovered].category, tree: tree)
+                            }
+                        }
                             .fixedSize()
                             .position(tooltipPosition(in: geo.size))
                             .allowsHitTesting(false)
@@ -216,7 +222,7 @@ struct TreemapView: View {
     }
 
     private var hoveredNode: Int? {
-        guard let hovered, hovered < items.count else { return nil }
+        guard let hovered, hovered < items.count, !items[hovered].isOther else { return nil }
         return Int(items[hovered].node)
     }
 
@@ -336,6 +342,18 @@ private struct TreemapBlocks: View, @MainActor Equatable {
         Canvas { ctx, _ in
             for item in items {
                 let rect = item.rect
+                if item.isOther {
+                    // Many small items as one block, marked so it does not read as a single file.
+                    ctx.fill(Path(rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(.primary.opacity(0.1)))
+                    ctx.stroke(Path(rect.insetBy(dx: 0.75, dy: 0.75)), with: .color(.primary.opacity(0.22)),
+                               style: StrokeStyle(lineWidth: 0.75, dash: [3, 2]))
+                    if rect.width >= 56 && rect.height >= 18 {
+                        let lines = CGRect(x: rect.minX + 4, y: rect.minY + 2, width: rect.width - 8, height: rect.height - 4)
+                        drawLabel(&ctx, name: "其他 \(item.otherCount) 项", size: rect.height >= 32 ? item.otherSize : nil,
+                                  in: lines, color: .secondary, weight: .medium)
+                    }
+                    continue
+                }
                 if item.isLeaf && item.category == .folder {
                     // A folder too small to open up: an empty box, so it does not read as a file type.
                     ctx.fill(Path(rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(.primary.opacity(0.08)))
@@ -395,7 +413,7 @@ private struct MapLayer: View, Sendable {
                 .equatable()
             if let marks {
                 Canvas { ctx, _ in
-                    for item in items where marks.basket.contains(Int(item.node)) {
+                    for item in items where !item.isOther && marks.basket.contains(Int(item.node)) {
                         ctx.fill(Path(item.rect), with: .color(.black.opacity(0.45)))
                         if item.rect.width > 28 && item.rect.height > 28 {
                             ctx.draw(Image(systemName: "tray.full"), at: CGPoint(x: item.rect.midX, y: item.rect.midY))
@@ -460,6 +478,29 @@ private struct SelectionRing: View {
             .opacity(rect == nil ? 0 : 1)
             .animation(.smooth(duration: 0.22), value: rect)
             .allowsHitTesting(false)
+    }
+}
+
+/// What the "other" block stands for.
+private struct OtherTooltip: View {
+    let count: Int
+    let size: Int64
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("其他 \(count) 项").fontWeight(.semibold)
+            Text("\(ByteFormat.string(size)) · 每一项都太小，画不出单独的方块")
+                .foregroundStyle(.secondary)
+            Text("在左侧列表里可以看到每一项")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .font(.callout)
+        .frame(maxWidth: 260, alignment: .leading)
+        .padding(8)
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+        .shadow(radius: 6, y: 2)
     }
 }
 

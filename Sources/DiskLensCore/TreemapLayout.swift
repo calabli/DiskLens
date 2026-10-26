@@ -10,6 +10,12 @@ public struct TreemapItem: Sendable {
     /// A folder with a title strip across its top.
     public var hasHeader: Bool
     public var category: FileCategory
+    /// For the block standing in for children too small to draw, how many it
+    /// covers and their total size; `node` is then their parent. 0 for others.
+    public var otherCount = 0
+    public var otherSize: Int64 = 0
+
+    public var isOther: Bool { otherCount > 0 }
 }
 
 public struct TreemapOptions: Sendable {
@@ -50,9 +56,23 @@ public enum TreemapLayout {
             areas.append(area)
         }
 
-        for (child, childRect) in zip(children, squarify(areas, in: rect)) {
+        // The children too small to draw share one "other" block, placed by its size among the rest.
+        let small = children.dropFirst(areas.count)
+        let smallSize = small.reduce(Int64(0)) { $0 + tree.totalSizes[Int($1)] }
+        let otherArea = Double(smallSize) * scale
+        let otherIndex = otherArea >= minArea * 4 ? (areas.firstIndex { $0 < otherArea } ?? areas.count) : nil
+        if let otherIndex { areas.insert(otherArea, at: otherIndex) }
+
+        var next = children.startIndex
+        for (index, childRect) in squarify(areas, in: rect).enumerated() {
             guard items.count < options.maxItems else { return }
-            place(Int(child), in: childRect, depth: depth, tree: tree, options: options, items: &items)
+            if index == otherIndex {
+                items.append(TreemapItem(node: Int32(node), rect: childRect, depth: depth, isLeaf: true, hasHeader: false,
+                                         category: .other, otherCount: small.count, otherSize: smallSize))
+                continue
+            }
+            place(Int(children[next]), in: childRect, depth: depth, tree: tree, options: options, items: &items)
+            next += 1
         }
     }
 

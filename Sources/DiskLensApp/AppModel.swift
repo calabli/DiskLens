@@ -99,6 +99,7 @@ final class AppModel {
         case duplicates
         case storage
         case apps
+        case history
     }
 
     var section: Section = .overview
@@ -728,13 +729,22 @@ final class AppModel {
     /// Moves every basket item to the Trash and takes it out of the tree.
     func trashBasket() {
         guard !isBusy else { return }
-        trashExternalItems()
-        guard var tree else { return }
+        guard var tree else {
+            trashExternalItems(after: [])
+            return
+        }
         var failures: [String] = []
+        var logged: [CleanupRecord.Item] = []
         for node in basket {
             let url = URL(fileURLWithPath: tree.path(of: node))
             do {
-                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                var trashed: NSURL?
+                try FileManager.default.trashItem(at: url, resultingItemURL: &trashed)
+                if let trashed = trashed as URL? {
+                    logged.append(CleanupRecord.Item(originalPath: url.path, trashPath: trashed.path,
+                                                     size: tree.totalSizes[node],
+                                                     isDirectory: tree.kinds[node] == .directory))
+                }
                 tree.remove(node)
             } catch {
                 failures.append("\(tree.names[node])：\(error.localizedDescription)")
@@ -743,6 +753,7 @@ final class AppModel {
         basket = []
         self.tree = tree
         treeVersion += 1
+        trashExternalItems(after: logged)
 
         // Stay inside a folder that still exists.
         while current != 0 && tree.isRemoved(current) {
@@ -761,13 +772,25 @@ final class AppModel {
 
     /// Items outside the scan go through Finder's own recycling, which asks for an
     /// administrator password where Finder would (apps installed from the App Store).
-    private func trashExternalItems() {
+    /// Then logs the whole cleanup, `logged` (items trashed from the tree) included.
+    private func trashExternalItems(after logged: [CleanupRecord.Item]) {
         let items = externalBasket
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty else {
+            logCleanup(logged)
+            return
+        }
         externalBasket = []
         NSWorkspace.shared.recycle(items.map { URL(fileURLWithPath: $0.path) }) { [weak self] recycled, error in
             Task { @MainActor in
                 guard let self else { return }
+                let external = items.compactMap { item -> CleanupRecord.Item? in
+                    guard let trashed = recycled[URL(fileURLWithPath: item.path)] else { return nil }
+                    var isDirectory: ObjCBool = false
+                    FileManager.default.fileExists(atPath: trashed.path, isDirectory: &isDirectory)
+                    return CleanupRecord.Item(originalPath: item.path, trashPath: trashed.path, size: item.size,
+                                              isDirectory: isDirectory.boolValue)
+                }
+                self.logCleanup(logged + external)
                 let failed = items.filter { recycled[URL(fileURLWithPath: $0.path)] == nil }
                 if !failed.isEmpty {
                     self.alertMessage = "有 \(failed.count) 项没能移到废纸篓"
@@ -782,6 +805,43 @@ final class AppModel {
 
     /// Bumped after items outside the scan went to the Trash, so lists of apps can reload.
     private(set) var externalItemsRecycled = 0
+
+    // MARK: Cleanup history
+
+    nonisolated static let cleanupLog = CleanupLog.standard
+    /// Past cleanups, newest first; loaded when the history is shown.
+    private(set) var cleanupRecords: [CleanupRecord] = []
+
+    private func logCleanup(_ items: [CleanupRecord.Item]) {
+        do {
+            try Self.cleanupLog.add(CleanupRecord(items: items))
+        } catch {
+            alertMessage = "清理记录没能保存：\(error.localizedDescription)"
+        }
+        reloadCleanupRecords()
+    }
+
+    func reloadCleanupRecords() {
+        cleanupRecords = Self.cleanupLog.records()
+    }
+
+    /// Moves items from the Trash back where they were, then brings the scan up to date.
+    func putBack(_ items: [CleanupRecord.Item], of record: CleanupRecord) {
+        var failures: [String] = []
+        for item in items {
+            do {
+                try Self.cleanupLog.putBack(item, of: record.id)
+            } catch {
+                failures.append("\(item.name)：\(error)")
+            }
+        }
+        reloadCleanupRecords()
+        if failures.count < items.count { rescan() }
+        if let path = lastScanPath { volume = VolumeInfo(path: path) }
+        if !failures.isEmpty {
+            alertMessage = "有 \(failures.count) 项没能放回：\n" + failures.prefix(5).joined(separator: "\n")
+        }
+    }
 }
 
 #if DEBUG
