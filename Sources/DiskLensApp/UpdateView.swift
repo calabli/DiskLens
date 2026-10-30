@@ -106,9 +106,21 @@ struct UpdateView: View {
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    /// Release notes are Markdown; headings and lists are kept as lines, emphasis and links rendered.
+    /// Release notes are Markdown: headings become bold lines, list items get bullets,
+    /// emphasis and links are rendered.
     private func attributed(_ markdown: String) -> AttributedString {
         let text = markdown.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                if let range = line.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
+                    return "**" + line[range.upperBound...] + "**"
+                }
+                if let range = line.range(of: #"^\s*[-*]\s+"#, options: .regularExpression) {
+                    return "• " + line[range.upperBound...]
+                }
+                return String(line)
+            }
+            .joined(separator: "\n")
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
     }
@@ -144,5 +156,45 @@ enum AboutPanel {
             .version: "",
             .credits: credits,
         ])
+    }
+}
+
+/// Hosts the update view in a window of its own.
+@MainActor
+enum UpdateWindow {
+    private static var window: NSWindow?
+    private static let closer = Closer()
+
+    static func sync(_ updater: AppUpdater) {
+        if updater.showWindow {
+            if window == nil {
+                let hosting = NSHostingController(rootView: UpdateView().environment(updater))
+                let window = NSWindow(contentViewController: hosting)
+                window.title = "软件更新"
+                window.styleMask = [.titled, .closable]
+                window.isReleasedWhenClosed = false
+                window.delegate = closer
+                window.center()
+                self.window = window
+            }
+            NSApp.activate()
+            window?.makeKeyAndOrderFront(nil)
+        } else {
+            let closing = window
+            window = nil
+            closing?.close()
+        }
+    }
+
+    /// Closing the window with its close button counts as "later".
+    private final class Closer: NSObject, NSWindowDelegate {
+        func windowWillClose(_ notification: Notification) {
+            MainActor.assumeIsolated {
+                if UpdateWindow.window != nil {
+                    UpdateWindow.window = nil
+                    AppUpdater.shared.close()
+                }
+            }
+        }
     }
 }

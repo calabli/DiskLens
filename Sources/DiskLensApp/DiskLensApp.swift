@@ -11,7 +11,7 @@ struct DiskLensApp: App {
     @State private var access = AccessModel()
     @State private var uninstaller = AppUninstaller()
     @State private var trashWatcher = TrashWatcher()
-    @State private var updater = AppUpdater()
+    @State private var updater = AppUpdater.shared
     @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
     @AppStorage(SpaceMonitor.Keys.menuBarShowsSpace) private var menuBarShowsSpace = false
 
@@ -29,10 +29,6 @@ struct DiskLensApp: App {
                 .environment(uninstaller)
                 .environment(trashWatcher)
                 .frame(minWidth: 960, minHeight: 600)
-                .sheet(isPresented: Binding(get: { updater.showWindow }, set: { if !$0 { updater.close() } })) {
-                    UpdateView()
-                        .environment(updater)
-                }
                 .task {
                     if UserHome.demoPath != nil {
                         // Screenshots: the same window size every time, dark unless asked otherwise.
@@ -51,8 +47,6 @@ struct DiskLensApp: App {
                         updater.check(userInitiated: true)
                         while case .checking = updater.state { try? await Task.sleep(for: .milliseconds(200)) }
                         if installs, case let .available(update) = updater.state { updater.install(update) }
-                    } else if UserHome.demoPath == nil {
-                        updater.checkIfDue()
                     }
                     model.rules.checkIfDue()
                 }
@@ -167,6 +161,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Needed when launched as a bare executable (swift run) rather than from the .app bundle.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
+        // Here rather than in a window, so it also runs when DiskLens starts in the menu bar only.
+        if UserHome.demoPath == nil && !CommandLine.arguments.contains("--check-updates") {
+            AppUpdater.shared.startSchedule()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

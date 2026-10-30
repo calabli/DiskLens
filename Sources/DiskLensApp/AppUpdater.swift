@@ -24,8 +24,14 @@ final class AppUpdater {
         static let skippedVersion = "updates.skippedVersion"
     }
 
+    static let shared = AppUpdater()
+
     private(set) var state: State = .idle
-    var showWindow = false
+    /// The update window is its own window, so it can appear while only the menu bar item is open.
+    var showWindow = false {
+        didSet { if showWindow != oldValue { UpdateWindow.sync(self) } }
+    }
+    @ObservationIgnored private var timer: Timer?
 
     static let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     static let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
@@ -34,11 +40,21 @@ final class AppUpdater {
     static let buildDate = (Bundle.main.infoDictionary?["DiskLensBuildDate"] as? String)
         .flatMap { ISO8601DateFormatter().date(from: $0) }
 
-    private static let checkInterval: TimeInterval = 24 * 60 * 60
+    private static let checkInterval: TimeInterval = 6 * 60 * 60
 
     var lastCheck: Date? { UserDefaults.standard.object(forKey: Keys.lastCheck) as? Date }
 
-    /// Once a day at most, when automatic checks are on (the default). Shows the window only
+    /// Checks now if due, then every hour sees whether it is due again. Called at launch,
+    /// whether or not the main window opens.
+    func startSchedule() {
+        guard timer == nil else { return }
+        checkIfDue()
+        timer = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) { _ in
+            Task { @MainActor in AppUpdater.shared.checkIfDue() }
+        }
+    }
+
+    /// Every 6 hours at most, when automatic checks are on (the default). Shows the window only
     /// when there is a version the user has not chosen to skip.
     func checkIfDue() {
         let defaults = UserDefaults.standard
@@ -96,7 +112,7 @@ final class AppUpdater {
                 }
                 state = .installing(update)
                 let installed = try Self.replaceRunningApp(with: newApp)
-                // macOS will not quit while a window has a sheet open, so close it first.
+                // Close the update window before quitting, so nothing holds the app open.
                 showWindow = false
                 try? await Task.sleep(for: .milliseconds(400))
                 Self.relaunch(installed)
