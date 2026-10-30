@@ -105,6 +105,7 @@ final class AppModel {
         case storage
         case apps
         case history
+        case devTools
     }
 
     var section: Section = .overview
@@ -126,6 +127,7 @@ final class AppModel {
     @ObservationIgnored private var installedApps: InstalledApps?
     @ObservationIgnored private var appNames: [String: String] = [:]
     let rules = RuleLibrary()
+    let devTools = DevToolsModel()
 
     private var scanner: DiskScanner?
     private var snapshotTask: Task<Void, Never>?

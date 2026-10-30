@@ -37,16 +37,35 @@ public struct CleanupRecord: Codable, Sendable, Identifiable, Hashable {
         }
     }
 
+    /// A cleanup done by running a tool's own command instead of trashing files,
+    /// which cannot be put back.
+    public struct CommandRun: Codable, Sendable, Hashable {
+        public let command: String
+        /// What was cleaned, e.g. "Docker 镜像 postgres:16".
+        public let subject: String
+        /// About how much it freed, as measured before running it.
+        public let size: Int64
+
+        public init(command: String, subject: String, size: Int64) {
+            self.command = command
+            self.subject = subject
+            self.size = size
+        }
+    }
+
     public let id: UUID
     public let date: Date
     public var items: [Item]
+    /// Missing in records written before commands could be run.
+    public var commands: [CommandRun]?
 
-    public var totalSize: Int64 { items.reduce(0) { $0 + $1.size } }
+    public var totalSize: Int64 { items.reduce(0) { $0 + $1.size } + (commands ?? []).reduce(0) { $0 + $1.size } }
 
-    public init(date: Date = Date(), items: [Item]) {
+    public init(date: Date = Date(), items: [Item], commands: [CommandRun]? = nil) {
         id = UUID()
         self.date = date
         self.items = items
+        self.commands = commands
     }
 }
 
@@ -75,7 +94,7 @@ public struct CleanupLog: Sendable {
     }
 
     public func add(_ record: CleanupRecord) throws {
-        guard !record.items.isEmpty else { return }
+        guard !record.items.isEmpty || !(record.commands ?? []).isEmpty else { return }
         try save(Array(([record] + records()).prefix(Self.limit)))
     }
 

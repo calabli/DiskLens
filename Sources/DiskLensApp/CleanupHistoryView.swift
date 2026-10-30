@@ -16,6 +16,9 @@ struct CleanupHistoryView: View {
                 List {
                     ForEach(model.cleanupRecords) { record in
                         Section {
+                            ForEach(record.commands ?? [], id: \.self) { run in
+                                CommandRow(run: run)
+                            }
                             ForEach(record.items) { item in
                                 ItemRow(item: item, record: record)
                             }
@@ -114,5 +117,37 @@ private struct ItemRow: View {
 
     private func show(_ path: String) {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+}
+
+/// A cleanup done with a tool's own command; it cannot be put back.
+private struct CommandRow: View {
+    let run: CleanupRecord.CommandRun
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "terminal")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(run.subject)
+                    .lineLimit(1)
+                Text(run.command)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
+            Spacer()
+            Text(ByteFormat.string(run.size))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Text("用命令清理，不能放回")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 96, alignment: .trailing)
+        }
+        .padding(.vertical, 2)
     }
 }

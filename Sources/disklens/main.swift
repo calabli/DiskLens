@@ -11,6 +11,7 @@ let usage = """
       --kb           print only the total in 1024-byte blocks, like `du -sk`
       --suggest      print cleanup suggestions instead of the largest items
       --app NAME     list everything an installed app has on disk (no path needed)
+      --dev          list installed toolchains, simulators, Docker images and caches
       --duplicates   list files with identical contents (1 MB and larger, outside ~/Library)
       --use-cache    update the saved scan from the change journal instead of rescanning,
                      then print what changed and save the new result
@@ -29,6 +30,7 @@ var kbOnly = false
 var suggest = false
 var useCache = false
 var duplicates = false
+var devTools = false
 var appQuery: String?
 var options = ScanOptions()
 
@@ -50,6 +52,7 @@ while let arg = args.next() {
     case "--suggest": suggest = true
     case "--use-cache": useCache = true
     case "--duplicates": duplicates = true
+    case "--dev": devTools = true
     case "--app":
         appQuery = args.next()
     case "-h", "--help":
@@ -62,6 +65,29 @@ while let arg = args.next() {
         }
         path = arg
     }
+}
+if devTools {
+    // `disklens --dev`: installed toolchains, simulators, images and caches.
+    for ecosystem in DevEcosystem.allCases {
+        let started = Date()
+        let group = DevEnvironmentScanner.discover(ecosystem, context: DevContext())
+        print("== \(ecosystem.title)  \(ByteFormat.string(group.totalSize))  (\(String(format: "%.1f", Date().timeIntervalSince(started))) s)")
+        if let note = group.note { print("   \(note)") }
+        for item in group.items {
+            let usage = switch item.usage {
+            case let .active(text), let .used(text), let .unused(text), let .regenerable(text): " [\(text)]"
+            case .unknown: ""
+            }
+            let removal = switch item.removal {
+            case let .command(command): "run: \(command.display)"
+            case .trash: "trash"
+            case let .none(reason): "keep: \(reason)"
+            }
+            print(String(format: "  %10@  %@ · %@%@  — %@", ByteFormat.string(item.size ?? 0) as NSString,
+                         item.kind as NSString, item.title as NSString, usage as NSString, removal as NSString))
+        }
+    }
+    exit(0)
 }
 guard let path = path ?? (appQuery != nil ? "~" : nil) else {
     print(usage)

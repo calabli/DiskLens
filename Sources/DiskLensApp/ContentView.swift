@@ -245,6 +245,8 @@ struct MainSplitView: View {
                 Label("重复文件", systemImage: "doc.on.doc")
                     .badge(duplicatesBadge)
                     .tag(AppModel.Section.duplicates)
+                Label("开发环境", systemImage: "hammer")
+                    .tag(AppModel.Section.devTools)
                 Label("清理记录", systemImage: "arrow.uturn.backward.circle")
                     .tag(AppModel.Section.history)
                 Label("变化", systemImage: "clock.arrow.circlepath")
@@ -277,6 +279,8 @@ struct MainSplitView: View {
                     AppsView()
                 case .history:
                     CleanupHistoryView()
+                case .devTools:
+                    DevToolsView()
                 }
                 Divider()
                 BasketBar()

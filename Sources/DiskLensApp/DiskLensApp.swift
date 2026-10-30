@@ -41,7 +41,7 @@ struct DiskLensApp: App {
                     model.rules.checkIfDue()
                 }
                 .task {
-                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes|history|unreadable` opens
+                    // `--scan <path>` starts scanning right away and `--show cleanup|large-files|changes|history|dev|unreadable` opens
                     // that page, for development and scripting.
                     let args = CommandLine.arguments
                     if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, model.phase == .idle {
@@ -61,6 +61,7 @@ struct DiskLensApp: App {
                         case "storage": model.section = .storage
                         case "apps": model.section = .apps
                         case "history": model.section = .history
+                        case "dev": model.section = .devTools
                         case "unreadable":
                             while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
                             model.showUnreadable = true
