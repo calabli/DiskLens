@@ -76,7 +76,10 @@ struct UnreadableFoldersSheet: View {
                         } header: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(group.title)（\(folders.count)）")
-                                Text(group.detail).font(.caption).foregroundStyle(.secondary).textCase(nil)
+                                Text(group == .privacy && access.isGranted && model.scannedWithFullDiskAccess
+                                     ? "已经开启了完全磁盘访问权限，macOS 仍不允许读取这些位置。"
+                                     : group.detail)
+                                    .font(.caption).foregroundStyle(.secondary).textCase(nil)
                             }
                             .padding(.bottom, 2)
                         }

@@ -195,6 +195,19 @@ final class AppModel {
         }
     }
 
+    /// Whether the last full scan of each folder ran with Full Disk Access. An update from the
+    /// change journal re-reads only what changed, so folders it could not read before stay
+    /// unread until a full scan with access.
+    private nonisolated static func noteFullScan(of path: String) {
+        UserDefaults.standard.set(FullDiskAccess.status() == .granted, forKey: "scan.fullDiskAccess." + path)
+    }
+
+    /// The current result comes from a full scan made with Full Disk Access.
+    var scannedWithFullDiskAccess: Bool {
+        guard let tree else { return false }
+        return UserDefaults.standard.bool(forKey: "scan.fullDiskAccess." + tree.rootPath)
+    }
+
     func fullRescan() {
         if let lastScanPath { scan(lastScanPath, full: true) }
     }
@@ -219,6 +232,7 @@ final class AppModel {
 
     private func startFullScan(_ path: String, eventID: UInt64, journalID: String?,
                                previous: (FileTree, Date)?, generation: Int) {
+        Self.noteFullScan(of: path)
         let scanner = DiskScanner { [weak self] files in
             Task { @MainActor in self?.reportProgress(files, path: path, generation: generation) }
         }
@@ -237,20 +251,21 @@ final class AppModel {
     /// cannot tell), then swaps the result in and compares it with `base`.
     private func update(from base: CachedScan, eventID: UInt64, journalID: String?, generation: Int) async {
         let path = base.tree.rootPath
-        let result = await Task.detached(priority: .userInitiated) { () -> Result<FileTree, Error> in
+        let result = await Task.detached(priority: .userInitiated) { () -> Result<(FileTree, Bool), Error> in
             Result {
                 if base.journalID != nil, base.journalID == journalID,
                    let changes = ChangeJournal.changes(under: path, since: base.eventID) {
-                    return try TreeUpdater.update(base.tree, applying: changes)
+                    return (try TreeUpdater.update(base.tree, applying: changes), false)
                 }
-                return try DiskScanner().scan(path)
+                Self.noteFullScan(of: path)
+                return (try DiskScanner().scan(path), true)
             }
         }.value
         guard generation == scanGeneration else { return }
         isUpdating = false
         showingSavedScanFrom = nil
         switch result {
-        case let .success(updated):
+        case let .success((updated, _)):
             adopt(updated)
             phase = .ready
             remember(updated, eventID: eventID, journalID: journalID)

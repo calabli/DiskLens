@@ -204,7 +204,6 @@ struct BrowserView: View {
             Divider()
             if !model.isScanning && tree.stats.unreadableDirectories > 0 {
                 UnreadableBanner(count: tree.stats.unreadableDirectories)
-                Divider()
             }
             HSplitView {
                 Group {
@@ -415,29 +414,68 @@ private struct UnreadableBanner: View {
     @Environment(AccessModel.self) private var access
     @Environment(AppModel.self) private var model
     let count: Int
+    @AppStorage("banner.unreadable.dismissed") private var dismissed = ""
+
+    /// What can still be done about the folders: grant access, rescan with it, or nothing.
+    private enum Situation {
+        case needsAccess, needsRescan, beyondAccess
+    }
+
+    private var situation: Situation {
+        if !access.isGranted { return .needsAccess }
+        return model.scannedWithFullDiskAccess ? .beyondAccess : .needsRescan
+    }
+
+    /// Dismissing hides the note for this folder and this many unreadable folders.
+    private var dismissKey: String { "\(model.tree?.rootPath ?? ""):\(count)" }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: access.isGranted ? "arrow.clockwise.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(access.isGranted ? Color.accentColor : Color.yellow)
-            Text(access.isGranted
-                 ? "已获得完全磁盘访问权限。完整扫描一次，就能包括之前读不到的 \(count) 个文件夹。"
-                 : "有 \(count) 个文件夹因为没有权限没能读取，结果可能偏小。")
-                .font(.callout)
-            Spacer()
-            Button("查看文件夹") { model.showUnreadable = true }
-                .font(.callout)
-            if access.isGranted {
-                Button("完整重新扫描") { model.fullRescan() }
-                    .font(.callout)
-                    .disabled(model.isBusy)
-            } else {
-                Button("开启完全磁盘访问权限…") { access.showGuide = true }
-                    .font(.callout)
+        if situation == .beyondAccess && dismissed == dismissKey {
+            EmptyView()
+        } else {
+            VStack(spacing: 0) {
+                content
+                Divider()
             }
         }
+    }
+
+    private var content: some View {
+        let situation = situation
+        return HStack(spacing: 8) {
+            switch situation {
+            case .needsAccess:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                Text("有 \(count) 个文件夹因为没有权限没能读取，结果可能偏小。")
+            case .needsRescan:
+                Image(systemName: "arrow.clockwise.circle.fill").foregroundStyle(Color.accentColor)
+                Text("已获得完全磁盘访问权限。完整扫描一次，就能包括之前读不到的 \(count) 个文件夹。")
+            case .beyondAccess:
+                Image(systemName: "lock.fill").foregroundStyle(.secondary)
+                Text("有 \(count) 个文件夹即使有完全磁盘访问权限也读不到，它们属于系统或受到额外保护，大小没有算进来。")
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("查看文件夹") { model.showUnreadable = true }
+            switch situation {
+            case .needsAccess:
+                Button("开启完全磁盘访问权限…") { access.showGuide = true }
+            case .needsRescan:
+                Button("完整重新扫描") { model.fullRescan() }
+                    .disabled(model.isBusy)
+            case .beyondAccess:
+                Button {
+                    dismissed = dismissKey
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .help("不再提示")
+            }
+        }
+        .font(.callout)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.yellow.opacity(0.12))
+        .background(situation == .beyondAccess ? Color.primary.opacity(0.04) : Color.yellow.opacity(0.12))
     }
 }
