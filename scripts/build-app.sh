@@ -5,9 +5,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-swift build -c release --product DiskLensApp
-swift build -c release --product DiskLensAgent
-BIN_DIR="$(swift build -c release --show-bin-path)"
+# Universal (Apple silicon and Intel). ARCHS="arm64" builds faster for local runs.
+ARCHS="${ARCHS:-arm64 x86_64}"
+ARCH_FLAGS=()
+for arch in $ARCHS; do ARCH_FLAGS+=(--arch "$arch"); done
+swift build -c release "${ARCH_FLAGS[@]}" --product DiskLensApp
+swift build -c release "${ARCH_FLAGS[@]}" --product DiskLensAgent
+BIN_DIR="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)"
 
 APP=build/DiskLens.app
 rm -rf "$APP"
