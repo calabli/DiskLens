@@ -20,10 +20,13 @@ public struct AvailableUpdate: Sendable, Equatable {
 /// Finds updates on GitHub Releases and downloads them, checking every
 /// archive against the signing key built into the app before using it.
 public enum SoftwareUpdate {
-    /// GitHub's release list; DISKLENS_UPDATE_FEED points it at a local copy for testing.
-    public static var releasesAPI: URL {
-        ProcessInfo.processInfo.environment["DISKLENS_UPDATE_FEED"].flatMap(URL.init(string:))
-            ?? URL(string: "https://api.github.com/repos/calabli/DiskLens/releases?per_page=20")!
+    /// Where the release list is read from, in order. The copy on GitHub Pages comes first:
+    /// GitHub's API allows only 60 unsigned requests an hour per network address, which
+    /// people behind a shared address can run out of. DISKLENS_UPDATE_FEED replaces both for testing.
+    public static var feeds: [URL] {
+        if let test = ProcessInfo.processInfo.environment["DISKLENS_UPDATE_FEED"].flatMap(URL.init(string:)) { return [test] }
+        return [URL(string: "https://calabli.github.io/DiskLens/updates/releases.json")!,
+                URL(string: "https://api.github.com/repos/calabli/DiskLens/releases?per_page=20")!]
     }
 
     /// "0.10.2" > "0.9", component by component; a leading "v" is ignored.
@@ -71,14 +74,29 @@ public enum SoftwareUpdate {
         return updates.max { isNewer($1.version, than: $0.version) }
     }
 
-    /// Asks GitHub for the newest release newer than `current`. Sends nothing about this Mac.
+    /// Asks for the newest release newer than `current`, trying each feed until one answers.
+    /// Sends nothing about this Mac.
     public static func check(current: String, includePrereleases: Bool = true,
                              session: URLSession = .shared) async throws -> AvailableUpdate? {
-        var request = URLRequest(url: releasesAPI, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 { throw URLError(.badServerResponse) }
-        return newest(in: data, newerThan: current, includePrereleases: includePrereleases)
+        try await check(current: current, includePrereleases: includePrereleases, feeds: feeds, session: session)
+    }
+
+    static func check(current: String, includePrereleases: Bool, feeds: [URL],
+                      session: URLSession) async throws -> AvailableUpdate? {
+        var lastError: Error = URLError(.badServerResponse)
+        for feed in feeds {
+            var request = URLRequest(url: feed, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            do {
+                let (data, response) = try await session.data(for: request)
+                if let http = response as? HTTPURLResponse, http.statusCode != 200 { throw URLError(.badServerResponse) }
+                guard (try? JSONSerialization.jsonObject(with: data)) is [Any] else { throw URLError(.cannotParseResponse) }
+                return newest(in: data, newerThan: current, includePrereleases: includePrereleases)
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     public enum Failure: Error, CustomStringConvertible, Equatable {

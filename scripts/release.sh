@@ -1,6 +1,7 @@
 #!/bin/bash
 # Publishes the version in VERSION as a GitHub release: runs the tests, builds the
-# universal app, zips it, signs the zip for the in-app updater, tags and uploads.
+# universal app, zips it, signs the zip for the in-app updater, tags and uploads,
+# then updates the release feed on GitHub Pages that the updater reads.
 #
 #   scripts/release.sh [--prerelease]
 #
@@ -38,4 +39,10 @@ TITLE="DiskLens $VERSION"
 [ -n "$PRERELEASE" ] && TITLE="$TITLE 预览版"
 { cat "$NOTES"; printf '\nSHA-256（DiskLens-%s.zip）：`%s`\n' "$VERSION" "$SHA"; } > build/release/notes.md
 gh release create "$TAG" "$ZIP" "$ZIP.sig" --title "$TITLE" --notes-file build/release/notes.md $PRERELEASE
+
+# The updater reads the release list from GitHub Pages first; publish the new list there.
+scripts/publish-update-feed.sh
+git add docs/updates/releases.json
+git commit -q -m "Update the release feed for $TAG"
+git push -q origin HEAD
 echo "Released $TAG"

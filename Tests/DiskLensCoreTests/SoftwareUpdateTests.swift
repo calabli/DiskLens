@@ -63,3 +63,21 @@ private func release(_ tag: String, prerelease: Bool = false, draft: Bool = fals
                                   into: root.appendingPathComponent("c"), publicKey: publicKey)
     }
 }
+
+@Test func aFeedThatFailsFallsBackToTheNext() async throws {
+    let folder = URL(fileURLWithPath: NSTemporaryDirectory() + "disklens-feeds-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let broken = folder.appendingPathComponent("broken.json")
+    try Data(#"{"message":"API rate limit exceeded"}"#.utf8).write(to: broken)
+    let good = folder.appendingPathComponent("releases.json")
+    try JSONSerialization.data(withJSONObject: [release("v0.3.0")]).write(to: good)
+    let missing = folder.appendingPathComponent("missing.json")
+
+    let update = try await SoftwareUpdate.check(current: "0.2.3", includePrereleases: true,
+                                                feeds: [missing, broken, good], session: .shared)
+    #expect(update?.version == "0.3.0")
+    await #expect(throws: (any Error).self) {
+        try await SoftwareUpdate.check(current: "0.2.3", includePrereleases: true, feeds: [missing, broken], session: .shared)
+    }
+}
