@@ -136,6 +136,9 @@ private struct UsageBar: View {
 struct SettingsView: View {
     @Environment(AccessModel.self) private var access
     @Environment(RuleLibrary.self) private var rules
+    @Environment(AppUpdater.self) private var updater
+    @AppStorage(AppUpdater.Keys.autoCheck) private var autoCheckUpdates = true
+    @AppStorage(AppUpdater.Keys.includePrereleases) private var includePrereleases = true
     @AppStorage(RuleLibrary.Keys.autoUpdate) private var autoUpdateRules = true
     @AppStorage(SpaceMonitor.Keys.menuBar) private var menuBar = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceAlerts) private var lowSpaceAlerts = true
@@ -166,6 +169,30 @@ struct SettingsView: View {
             Section {
                 Toggle("在菜单栏显示可用空间", isOn: $menuBar)
                 Text("开启时，关掉主窗口后 DiskLens 继续留在菜单栏。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("软件更新") {
+                LabeledContent("当前版本") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(AppUpdater.versionLabel)
+                        if let date = AppUpdater.buildDate {
+                            Text("编译于 " + date.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Toggle("自动检查更新", isOn: $autoCheckUpdates)
+                Toggle("包括预览版", isOn: $includePrereleases)
+                HStack {
+                    Text(updater.lastCheck.map { "上次检查：" + $0.formatted(.relative(presentation: .named)) } ?? "还没有检查过")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("检查更新…") { updater.check(userInitiated: true) }
+                }
+                Text("每天最多查一次 GitHub 上的发布列表，不发送任何关于这台 Mac 的信息。新版本下载后会先校验签名再安装。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

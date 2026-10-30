@@ -19,6 +19,9 @@ let usage = """
     disklens rules keygen|sign …   sign cleanup rules for publishing (see `disklens rules`)
     """
 
+if CommandLine.arguments.dropFirst().first == "sign" {
+    exit(RulesCommand.signFile(Array(CommandLine.arguments.dropFirst(2))))
+}
 if CommandLine.arguments.dropFirst().first == "rules" {
     exit(RulesCommand.run(Array(CommandLine.arguments.dropFirst(2))))
 }

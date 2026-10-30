@@ -11,6 +11,7 @@ struct DiskLensApp: App {
     @State private var access = AccessModel()
     @State private var uninstaller = AppUninstaller()
     @State private var trashWatcher = TrashWatcher()
+    @State private var updater = AppUpdater()
     @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
 
     init() {
@@ -27,6 +28,10 @@ struct DiskLensApp: App {
                 .environment(uninstaller)
                 .environment(trashWatcher)
                 .frame(minWidth: 960, minHeight: 600)
+                .sheet(isPresented: Binding(get: { updater.showWindow }, set: { if !$0 { updater.close() } })) {
+                    UpdateView()
+                        .environment(updater)
+                }
                 .task {
                     if UserHome.demoPath != nil {
                         // Screenshots: the same window size every time, dark unless asked otherwise.
@@ -38,6 +43,16 @@ struct DiskLensApp: App {
                     monitor.start()
                     trashWatcher.start()
                     model.rules.onUpdate = { [weak model] in model?.refreshSuggestions() }
+                    let args = CommandLine.arguments
+                    if args.contains("--check-updates") {
+                        // With a test feed (DISKLENS_UPDATE_FEED), --install-update also installs what it finds.
+                        let installs = args.contains("--install-update") && ProcessInfo.processInfo.environment["DISKLENS_UPDATE_FEED"] != nil
+                        updater.check(userInitiated: true)
+                        while case .checking = updater.state { try? await Task.sleep(for: .milliseconds(200)) }
+                        if installs, case let .available(update) = updater.state { updater.install(update) }
+                    } else if UserHome.demoPath == nil {
+                        updater.checkIfDue()
+                    }
                     model.rules.checkIfDue()
                 }
                 .task {
@@ -105,8 +120,13 @@ struct DiskLensApp: App {
             SettingsView()
                 .environment(access)
                 .environment(model.rules)
+                .environment(updater)
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("关于 DiskLens") { AboutPanel.show() }
+                Button("检查更新…") { updater.check(userInitiated: true) }
+            }
             CommandGroup(replacing: .newItem) {
                 Button("扫描主目录") { model.scan(AppModel.homePath) }
                     .keyboardShortcut("1", modifiers: .command)

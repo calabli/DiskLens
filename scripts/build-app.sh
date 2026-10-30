@@ -54,7 +54,14 @@ PLIST
 cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
 cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+# Version from VERSION; the build number counts commits, so every release is higher.
+VERSION="$(tr -d '[:space:]' < VERSION)"
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [ -n "$(git status --porcelain -- Sources Package.swift 2>/dev/null)" ]; then COMMIT="$COMMIT-dirty"; fi
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -72,9 +79,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$BUILD</string>
+    <key>DiskLensBuildDate</key>
+    <string>$BUILD_DATE</string>
+    <key>DiskLensCommit</key>
+    <string>$COMMIT</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSApplicationCategoryType</key>
