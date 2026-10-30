@@ -13,6 +13,7 @@ struct DiskLensApp: App {
     @State private var trashWatcher = TrashWatcher()
     @State private var updater = AppUpdater()
     @AppStorage(SpaceMonitor.Keys.menuBar) private var showsMenuBarItem = true
+    @AppStorage(SpaceMonitor.Keys.menuBarShowsSpace) private var menuBarShowsSpace = false
 
     init() {
         SpaceMonitor.registerDefaults()
@@ -112,7 +113,12 @@ struct DiskLensApp: App {
             // Kept to a plain title and symbol: the menu bar renders the label as an image,
             // and a richer view (with tasks or environment lookups) re-renders endlessly.
             // A Label shows only its icon in the menu bar; one Text carries both.
-            Text("\(Image(systemName: monitor.isLow ? "exclamationmark.triangle.fill" : "internaldrive")) \(monitor.menuBarTitle)")
+            // Just the icon unless asked for the number; when space runs low the number shows anyway.
+            if menuBarShowsSpace || monitor.isLow {
+                Text("\(Image(systemName: monitor.isLow ? "exclamationmark.triangle.fill" : "internaldrive")) \(monitor.menuBarTitle)")
+            } else {
+                Text("\(Image(systemName: "internaldrive"))")
+            }
         }
         .menuBarExtraStyle(.window)
 

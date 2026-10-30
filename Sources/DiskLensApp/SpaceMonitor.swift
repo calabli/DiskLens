@@ -10,6 +10,8 @@ import UserNotifications
 final class SpaceMonitor {
     enum Keys {
         static let menuBar = "menubar.enabled"
+        /// Free space as text beside the icon; off by default, so the menu bar holds just an icon.
+        static let menuBarShowsSpace = "menubar.showsSpace"
         static let lowSpaceAlerts = "alerts.lowSpace"
         static let lowSpaceThreshold = "alerts.lowSpaceThresholdGB"
         static let growthAlerts = "alerts.fastGrowth"
@@ -18,6 +20,7 @@ final class SpaceMonitor {
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
             Keys.menuBar: true,
+            Keys.menuBarShowsSpace: false,
             Keys.lowSpaceAlerts: true,
             Keys.lowSpaceThreshold: 20,
             Keys.growthAlerts: true,

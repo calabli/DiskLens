@@ -141,6 +141,7 @@ struct SettingsView: View {
     @AppStorage(AppUpdater.Keys.includePrereleases) private var includePrereleases = true
     @AppStorage(RuleLibrary.Keys.autoUpdate) private var autoUpdateRules = true
     @AppStorage(SpaceMonitor.Keys.menuBar) private var menuBar = true
+    @AppStorage(SpaceMonitor.Keys.menuBarShowsSpace) private var menuBarShowsSpace = false
     @AppStorage(SpaceMonitor.Keys.lowSpaceAlerts) private var lowSpaceAlerts = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceThreshold) private var threshold = 20
     @AppStorage(SpaceMonitor.Keys.growthAlerts) private var growthAlerts = true
@@ -167,8 +168,10 @@ struct SettingsView: View {
             }
             .onAppear { access.refresh() }
             Section {
-                Toggle("在菜单栏显示可用空间", isOn: $menuBar)
-                Text("开启时，关掉主窗口后 DiskLens 继续留在菜单栏。")
+                Toggle("在菜单栏显示 DiskLens", isOn: $menuBar)
+                Toggle("在图标旁显示可用空间", isOn: $menuBarShowsSpace)
+                    .disabled(!menuBar)
+                Text("关掉时菜单栏只有一个图标，点开才看到可用空间；空间不足时会自动显示数字。开启菜单栏后，关掉主窗口 DiskLens 也会留在菜单栏。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
