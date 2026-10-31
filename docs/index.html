@@ -65,6 +65,7 @@ p { margin: 0; }
 .nav nav a { color: var(--muted); }
 .nav nav a:hover { color: var(--fg); text-decoration: none; }
 .pill { font-size: 12px; font-weight: 600; color: var(--fg); background: var(--accent); padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
+.pill:hover { text-decoration: none; filter: brightness(1.12); }
 @media (max-width: 720px) { .nav nav { display: none; } .pill { margin-left: auto; } }
 
 /* hero */
@@ -216,10 +217,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <a href="#clean">清理</a>
       <a href="#search">搜索</a>
       <a href="#timeline">时间线</a>
+      <a href="#dev">开发环境</a>
       <a href="#undo">清理记录</a>
       <a href="#privacy">隐私</a>
     </nav>
-    <span class="pill">即将推出</span>
+    <a class="pill" href="https://github.com/calabli/DiskLens/releases/latest" target="_blank" rel="noopener">下载</a>
   </div>
 </header>
 
@@ -229,7 +231,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="eyebrow">DiskLens · 磁盘空间分析</p>
       <h1>看清<span class="grad">每一 GB</span><br>的去向。</h1>
       <p class="lede">原生速度扫完整块磁盘，把空间画成一张可以放大的地图，再告诉你哪些能放心删掉、删了会怎样。</p>
-      <div class="hero-meta"><span>原生 macOS 应用</span><span>数据只留在你的 Mac 上</span><span>macOS 14 及以上</span></div>
+      <div class="hero-meta"><span>预览版 0.2.4 已发布</span><span>原生 macOS 应用</span><span>数据只留在你的 Mac 上</span><span>macOS 14 及以上</span></div>
 
       <div class="window" role="group" aria-label="DiskLens 演示窗口">
         <div class="titlebar">
@@ -337,6 +339,24 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     </div>
   </section>
 
+  <section class="band" id="dev">
+    <div class="wrap">
+      <div class="head lift">
+        <p class="eyebrow">开发环境</p>
+        <h2 class="h2">Xcode、Docker、Gradle，<br>哪些还在用，一目了然。</h2>
+        <p class="lede">开发工具往往是 Mac 上最大的隐形占用。DiskLens 找出装了哪些版本、模拟器、镜像和缓存，标出哪些正在用、哪些已经没人用，再用工具自己的命令把它们删掉。</p>
+      </div>
+      <figure class="shot lift">
+        <img src="img/devtools.jpg" width="2000" height="1250" alt="开发环境页面：按 Xcode 与模拟器、Docker、Java、Go 分组，标出哪些还在用、哪些已经不用" decoding="async" loading="lazy">
+      </figure>
+      <div class="facts lift">
+        <div><b>知道还在不在用</b><span>当前选中的 Xcode、默认的 JDK、每台设备最新的调试符号、项目还在的编译缓存，都会标出来。</span></div>
+        <div><b>用工具自己的命令</b><span>模拟器用 simctl，镜像用 docker，Homebrew 用 brew cleanup；运行前先给你看完整的命令。</span></div>
+        <div><b>删了也有记录</b><span>每次清理都记进清理记录，普通文件夹照旧移到废纸篓，可以放回。</span></div>
+      </div>
+    </div>
+  </section>
+
   <section class="band" id="undo">
     <div class="wrap split">
       <div class="head lift">
@@ -370,8 +390,8 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <div class="card"><h3>重复文件</h3><p>先比大小，再比头尾，最后逐字节核对。APFS 克隆出来的副本不占额外空间，不会被误报。</p></div>
         <div class="card"><h3>变化对比</h3><p>和上一次扫描相比，哪些文件夹长了、哪些变小了，按变化大小排好。</p></div>
         <div class="card"><h3>存储详情</h3><p>「系统数据」到底是什么：系统卷、本地快照、可清除空间，分开讲清楚。</p></div>
-        <div class="card"><h3>菜单栏</h3><p>剩余空间常驻菜单栏，快满了、或者一小时内突然多用了很多时，发通知提醒你。</p></div>
-        <div class="card"><h3>读不到的文件夹</h3><p>没有权限的文件夹会单独列出来，告诉你原因，以及怎样开启完全磁盘访问权限。</p></div>
+        <div class="card"><h3>菜单栏</h3><p>菜单栏里一个安静的图标，点开就看到可用空间；快满了、或者一小时内突然多用了很多时，发通知提醒你。</p></div>
+        <div class="card"><h3>自动更新</h3><p>有新版本时提醒你，一键下载安装。安装包先校验签名再替换，旧版本移到废纸篓。</p></div>
       </div>
     </div>
   </section>
@@ -385,7 +405,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="lede">扫描结果、写入记录和清理历史都存在你自己的 Mac 上。DiskLens 不上传文件名，不收集使用数据，也不需要账号。</p>
       <div class="trio lift">
         <div><b>不上传任何数据</b><span>所有分析都在本机完成。</span></div>
-        <div><b>只下载清理规则</b><span>每天最多检查一次公开的规则文件，带签名，可以在设置里关掉。</span></div>
+        <div><b>只下载公开的东西</b><span>清理规则和新版本信息，都带签名校验；两者都可以在设置里关掉。</span></div>
         <div><b>删之前先确认</b><span>文件只会移到废纸篓，并留有记录，随时可以放回。</span></div>
       </div>
     </div>
@@ -394,11 +414,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   <section class="band cta">
     <div class="wrap">
       <img class="mark big-mark" src="img/icon.png" width="96" height="96" alt="">
-      <h2 class="h2 lift">DiskLens<br><span class="grad">即将推出。</span></h2>
-      <p class="lede">支持 macOS 14 Sonoma 及以上，Apple 芯片和 Intel 机型都能用。</p>
+      <h2 class="h2 lift">DiskLens<br><span class="grad">预览版已发布。</span></h2>
+      <p class="lede">支持 macOS 14 Sonoma 及以上，Apple 芯片和 Intel 机型都能用。预览版还没有经过苹果公证，第一次打开时请按住 Control 点按 DiskLens，选「打开」。</p>
       <div class="cta-row">
-        <a class="primary" href="https://github.com/calabli/DiskLens" target="_blank" rel="noopener">在 GitHub 上关注</a>
-        <a class="secondary" href="#top">再看一遍演示</a>
+        <a class="primary" href="https://github.com/calabli/DiskLens/releases/latest" target="_blank" rel="noopener">下载 0.2.4</a>
+        <a class="secondary" href="https://github.com/calabli/DiskLens" target="_blank" rel="noopener">在 GitHub 上查看</a>
       </div>
     </div>
   </section>

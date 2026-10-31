@@ -15,7 +15,8 @@ struct DevToolsView: View {
             Header(groups: groups)
             Divider()
             List {
-                ForEach(DevEcosystem.allCases, id: \.self) { ecosystem in
+                // Ecosystems found to have nothing are named once at the end instead of each taking a section.
+                ForEach(DevEcosystem.allCases.filter { tools.groups[$0].map { !$0.items.isEmpty } ?? true }, id: \.self) { ecosystem in
                     Section {
                         if let group = tools.groups[ecosystem] {
                             if let note = group.note {
@@ -31,6 +32,12 @@ struct DevToolsView: View {
                         GroupHeader(ecosystem: ecosystem, group: tools.groups[ecosystem],
                                     loading: tools.loading.contains(ecosystem))
                     }
+                }
+                let missing = DevEcosystem.allCases.filter { tools.groups[$0]?.items.isEmpty == true }
+                if !missing.isEmpty {
+                    Text("没有检测到：" + missing.map(\.title).joined(separator: "、"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

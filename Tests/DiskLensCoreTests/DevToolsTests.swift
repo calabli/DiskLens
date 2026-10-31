@@ -37,6 +37,11 @@ import Testing
                  "iPhone14,2 18.1 (22B83)": 1.0]
     let newest = AppleTools.newestPerDevice(Array(dates.keys)) { dates[$0].map(Date.init(timeIntervalSince1970:)) }
     #expect(newest == ["iPhone16,1 27.2 (24B119)", "iPhone14,2 18.1 (22B83)"])
+
+    // The system version decides, not which folder happens to be newer on disk.
+    let reversed = ["iPhone16,1 17.6 (21G80)": 9.0, "iPhone16,1 18.0 (22A3354)": 1.0]
+    #expect(AppleTools.newestPerDevice(Array(reversed.keys)) { reversed[$0].map(Date.init(timeIntervalSince1970:)) }
+            == ["iPhone16,1 18.0 (22A3354)"])
 }
 
 @Test func dockerImagesAndUsageAreRead() throws {

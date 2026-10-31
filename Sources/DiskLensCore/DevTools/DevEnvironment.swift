@@ -91,11 +91,19 @@ public struct DevContext: Sendable {
     public var run: @Sendable (ToolCommand, TimeInterval) -> ToolCommand.Result?
 
     public init(home: String = UserHome.path, tree: FileTree? = nil,
-                run: @escaping @Sendable (ToolCommand, TimeInterval) -> ToolCommand.Result? = { try? $0.run(timeout: $1) }) {
+                run: @escaping @Sendable (ToolCommand, TimeInterval) -> ToolCommand.Result? = DevContext.defaultRun) {
         self.home = home
         self.tree = tree
         self.run = run
     }
+
+    /// Runs the real tool, except in a demo, where what is installed on this Mac must not show.
+    public static let defaultRun: @Sendable (ToolCommand, TimeInterval) -> ToolCommand.Result? = { command, timeout in
+        UserHome.demoPath == nil ? try? command.run(timeout: timeout) : nil
+    }
+
+    /// Folders outside the home folder (like /Applications) are left out in a demo.
+    var looksOutsideHome: Bool { UserHome.demoPath == nil }
 
     /// Standard output of a command that succeeded, or nil.
     func output(_ program: String, _ arguments: [String], timeout: TimeInterval = 30) -> String? {

@@ -20,7 +20,7 @@ enum AppleTools {
 
     private static func xcodes(_ context: DevContext) -> [DevItem] {
         let selected = context.output("xcode-select", ["-p"])?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let roots = ["/Applications", context.home + "/Applications"]
+        let roots = (context.looksOutsideHome ? ["/Applications"] : []) + [context.home + "/Applications"]
         return roots.flatMap { root in
             ((try? FileManager.default.contentsOfDirectory(atPath: root)) ?? [])
                 .filter { $0.hasPrefix("Xcode") && $0.hasSuffix(".app") }
@@ -159,11 +159,19 @@ enum AppleTools {
     }
 
     /// Device support folders are named "iPhone16,1 27.0.1 (24A446)": the model, then the
-    /// system version. Per model, the folder made last is the one in use.
+    /// system version. Per model, the highest system version is the one in use; folders
+    /// without a readable version fall back to the one made last.
     static func newestPerDevice(_ names: [String], modified: (String) -> Date?) -> Set<String> {
-        let byModel = Dictionary(grouping: names) { $0.split(separator: " ").first.map(String.init) ?? $0 }
+        let parts = { (name: String) in name.split(separator: " ").map(String.init) }
+        let byModel = Dictionary(grouping: names) { parts($0).first ?? $0 }
         return Set(byModel.values.compactMap { group in
-            group.max { (modified($0) ?? .distantPast) < (modified($1) ?? .distantPast) }
+            group.max { a, b in
+                let va = parts(a).dropFirst().first, vb = parts(b).dropFirst().first
+                if let va, let vb, va != vb, va.first?.isNumber == true, vb.first?.isNumber == true {
+                    return SoftwareUpdate.isNewer(vb, than: va)
+                }
+                return (modified(a) ?? .distantPast) < (modified(b) ?? .distantPast)
+            }
         })
     }
 
@@ -180,7 +188,7 @@ enum AppleTools {
             // "Balance-dcpdfurxzfyvaleftwwznpamjqlg" → "Balance"; shared caches such as "SymbolCache.noindex" keep their name.
             let project = folder.range(of: #"-[a-z]{28}$"#, options: .regularExpression).map { String(folder[..<$0.lowerBound]) }
             let name = workspace.map { ($0 as NSString).lastPathComponent } ?? project ?? folder
-            return DevItem(id: "derived:" + path, ecosystem: .apple, kind: project == nil ? "Xcode 共享缓存" : "编译缓存", title: name,
+            return DevItem(id: "derived:" + path, ecosystem: .apple, kind: workspace == nil && project == nil ? "Xcode 共享缓存" : "编译缓存", title: name,
                            detail: workspace.map { ($0 as NSString).deletingLastPathComponent.abbreviatingHome },
                            path: path, size: context.size(of: path), lastUsed: accessed, usage: usage,
                            removal: .trash(path),

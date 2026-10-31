@@ -125,6 +125,24 @@ fill("Projects/ios-client/build", 3 * GB, with: 64 * MB) { "Intermediates/obj-\(
 fill(".npm/_cacache/content-v2/sha512", 3 * GB, with: MB) { String(format: "%02x/%02x/%060x", $0 % 256, ($0 / 7) % 256, $0 &* 104_729) }
 fill(".gradle/caches/modules-2/files-2.1", 2 * GB, with: 8 * MB) { "lib-\($0).jar" }
 
+// MARK: More developer tools, for the Dev Environments page
+
+// An updated iPhone leaves its older system's symbols behind; one DerivedData's project is gone.
+fill("Library/Developer/Xcode/iOS DeviceSupport/iPhone16,1 17.6 (21G80)/Symbols/System/Library/PrivateFrameworks",
+     4400 * MB, with: 64 * MB) { "Framework\($0).framework" }
+for (folder, workspace) in [("Lumen-ahfkqbxdmeywcrgoxzrlnmpa", "Projects/ios-client/Lumen.xcodeproj"),
+                            ("WeatherKit-dkehqzpwxtrbbqfhjyavmlu", "Projects/weatherkit/WeatherKit.xcodeproj")] {
+    let info: NSDictionary = ["WorkspacePath": home + "/" + workspace, "LastAccessedDate": daysAgo(workspace.contains("weather") ? 120 : 1)]
+    info.write(toFile: home + "/\(derived)/\(folder)/info.plist", atomically: true)
+}
+try fm.createDirectory(atPath: home + "/Projects/ios-client/Lumen.xcodeproj", withIntermediateDirectories: true)
+fill("Library/Developer/Xcode/DerivedData/ModuleCache.noindex", 900 * MB, with: 8 * MB) { "module-\($0).pcm" }
+fill(".gradle/wrapper/dists/gradle-8.7-bin/abc123", 150 * MB, with: 8 * MB) { "gradle-\($0).jar" }
+fill(".gradle/wrapper/dists/gradle-7.6-bin/def456", 140 * MB, with: 8 * MB) { "gradle-\($0).jar" }
+fill(".m2/repository/org", 1800 * MB, with: 8 * MB) { "artifact-\($0).jar" }
+fill("go/pkg/mod/github.com", 4 * GB, with: 8 * MB) { "module-\($0).zip" }
+fill("Library/Caches/go-build", 900 * MB, with: MB) { String(format: "%02x/%062x-d", $0 % 256, $0 &* 31) }
+
 // MARK: Downloads, with a few true duplicates
 
 for (name, size) in [("Xcode_16.1.xip", 2 * GB), ("ubuntu-24.04.1-desktop-arm64.iso", 2 * GB), ("旅行素材.zip", 2 * GB),
