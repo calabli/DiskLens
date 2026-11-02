@@ -6,13 +6,18 @@ enum AppleTools {
     static func discover(_ context: DevContext) -> DevGroup {
         var items: [DevItem] = []
         items += xcodes(context)
-        let devices = context.output("xcrun", ["simctl", "list", "devices", "--json"]).flatMap { parseDevices(Data($0.utf8)) } ?? []
+        // The simulator service sometimes takes minutes to answer; past 10 seconds, say so and go on.
+        let deviceList = context.output("xcrun", ["simctl", "list", "devices", "--json"], timeout: 10)
+        let simulatorsUnavailable = deviceList == nil && !items.isEmpty && context.looksOutsideHome
+        let devices = deviceList.flatMap { parseDevices(Data($0.utf8)) } ?? []
         items += devices.map { simulator($0, context) }
-        let runtimes = context.output("xcrun", ["simctl", "runtime", "list", "-j"]).flatMap { parseRuntimes(Data($0.utf8)) } ?? []
+        let runtimes = simulatorsUnavailable ? [] :
+            context.output("xcrun", ["simctl", "runtime", "list", "-j"], timeout: 10).flatMap { parseRuntimes(Data($0.utf8)) } ?? []
         items += runtimes.map { runtime($0, devices: devices) }
         items += deviceSupport(context)
         items += derivedData(context)
-        let note = items.isEmpty ? "没有找到 Xcode 或它的数据。" : nil
+        let note = items.isEmpty ? "没有找到 Xcode 或它的数据。"
+            : simulatorsUnavailable ? "模拟器服务（CoreSimulator）没有响应，这次没能列出模拟器；稍后点「重新检测」再试。" : nil
         return DevGroup(ecosystem: .apple, items: items, note: note)
     }
 

@@ -2,15 +2,21 @@ import Foundation
 
 /// A family of developer tools DiskLens knows how to look after.
 public enum DevEcosystem: String, CaseIterable, Sendable {
-    case apple, docker, homebrew, java, go
+    case apple, android, docker, ai, homebrew, node, python, java, go, rust, ruby
 
     public var title: String {
         switch self {
         case .apple: "Xcode 与模拟器"
+        case .android: "Android"
         case .docker: "Docker"
+        case .ai: "AI 模型"
         case .homebrew: "Homebrew"
+        case .node: "Node.js"
+        case .python: "Python"
         case .java: "Java"
         case .go: "Go"
+        case .rust: "Rust"
+        case .ruby: "Ruby"
         }
     }
 }
@@ -133,6 +139,41 @@ public struct DevContext: Sendable {
             .filter { var isDir: ObjCBool = false; return FileManager.default.fileExists(atPath: $0, isDirectory: &isDir) && isDir.boolValue }
     }
 
+    /// The first line of a small text file, trimmed.
+    func firstLine(_ path: String) -> String? {
+        guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+        return text.split(whereSeparator: \.isNewline).first.map { $0.trimmingCharacters(in: .whitespaces) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// The versions that projects in the scan ask for in files like `.nvmrc` or `.python-version`,
+    /// one entry per project file (dependency folders left out).
+    func projectVersions(in names: [String]) -> [String] {
+        names.flatMap(filesInScan(named:))
+            .filter { !$0.contains("/node_modules/") && !$0.contains("/.git/") }
+            .compactMap(firstLine)
+    }
+
+    /// How a version is used: the default one, asked for by projects, or neither.
+    func usage(of version: String, isDefault: Bool, wanted: [String]) -> DevItem.Usage {
+        if isDefault { return .active("当前默认") }
+        let projects = wanted.filter { DevContext.version($0, matches: version) }.count
+        if projects > 0 { return .used("\(projects) 个项目在用") }
+        return tree == nil ? .unknown : .unused("扫描范围内没有项目在用")
+    }
+
+    /// Whether `wanted` (as a project file writes it: "18", "v20.11", "3.11", "ruby-3.2.2")
+    /// is satisfied by the installed `version`: equal, or a prefix of whole components.
+    static func version(_ wanted: String, matches version: String) -> Bool {
+        let clean = { (v: String) in
+            v.lowercased().replacingOccurrences(of: #"^(v|ruby-|python-|node-)"#, with: "", options: .regularExpression)
+                .split(separator: ".").map(String.init)
+        }
+        let w = clean(wanted.trimmingCharacters(in: .whitespaces)), v = clean(version)
+        guard !w.isEmpty, w.count <= v.count else { return false }
+        return Array(v.prefix(w.count)) == w
+    }
+
     /// Files named `name` anywhere in the current scan (none without a scan).
     func filesInScan(named name: String) -> [String] {
         guard let tree else { return [] }
@@ -153,6 +194,12 @@ public enum DevEnvironmentScanner {
         case .homebrew: HomebrewTools.discover(context)
         case .java: JavaTools.discover(context)
         case .go: GoTools.discover(context)
+        case .node: NodeTools.discover(context)
+        case .python: PythonTools.discover(context)
+        case .ruby: RubyTools.discover(context)
+        case .rust: RustTools.discover(context)
+        case .android: AndroidTools.discover(context)
+        case .ai: ModelTools.discover(context)
         }
         group.items.sort { ($0.size ?? 0) > ($1.size ?? 0) }
         return group
