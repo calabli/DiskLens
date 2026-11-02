@@ -143,6 +143,37 @@ fill(".m2/repository/org", 1800 * MB, with: 8 * MB) { "artifact-\($0).jar" }
 fill("go/pkg/mod/github.com", 4 * GB, with: 8 * MB) { "module-\($0).zip" }
 fill("Library/Caches/go-build", 900 * MB, with: MB) { String(format: "%02x/%062x-d", $0 % 256, $0 &* 31) }
 
+// Android, AI models, Node and Python versions, for the second half of Dev Environments.
+let sdk = "Library/Android/sdk"
+fill("\(sdk)/system-images/android-34/google_apis/arm64-v8a", 6 * GB, with: 500 * MB) { "system-\($0).img" }
+fill("\(sdk)/system-images/android-31/google_apis/arm64-v8a", 5 * GB, with: 500 * MB) { "system-\($0).img" }
+fill("\(sdk)/build-tools/34.0.0", 140 * MB, with: 8 * MB) { "lib-\($0)" }
+fill("\(sdk)/build-tools/30.0.3", 120 * MB, with: 8 * MB) { "lib-\($0)" }
+fill(".android/avd/Pixel_8_API_34.avd", 2 * GB, with: 500 * MB) { "userdata-\($0).img" }
+try "image.sysdir.1=system-images/android-34/google_apis/arm64-v8a/\n".write(toFile: home + "/.android/avd/Pixel_8_API_34.avd/config.ini", atomically: true, encoding: .utf8)
+func ollamaModel(_ name: String, _ tag: String, gigabytes: Int64) throws {
+    let blob = "sha256:" + String(repeating: name.first.map(String.init) ?? "a", count: 8) + tag
+    fill(".ollama/models/blobs", gigabytes * GB, with: 2 * GB) { "\(blob)-\($0)" }
+    let manifest = home + "/.ollama/models/manifests/registry.ollama.ai/library/\(name)/\(tag)"
+    try fm.createDirectory(atPath: (manifest as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+    try JSONSerialization.data(withJSONObject: ["config": ["digest": blob + "c", "size": 485],
+                                               "layers": [["digest": blob, "size": gigabytes * GB]]])
+        .write(to: URL(fileURLWithPath: manifest))
+}
+try ollamaModel("qwen2.5", "14b", gigabytes: 8)
+try ollamaModel("llama3.1", "8b", gigabytes: 4)
+fill(".cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/blobs", 6 * GB, with: 2 * GB) { "shard-\($0)" }
+for version in ["v18.19.0", "v20.11.1", "v22.3.0"] {
+    fill(".nvm/versions/node/\(version)/lib/node_modules/npm", 120 * MB, with: 8 * MB) { "chunk-\($0).js" }
+}
+try fm.createDirectory(atPath: home + "/.nvm/alias", withIntermediateDirectories: true)
+try "22\n".write(toFile: home + "/.nvm/alias/default", atomically: true, encoding: .utf8)
+try "18\n".write(toFile: home + "/Projects/lumen-web/.nvmrc", atomically: true, encoding: .utf8)
+for version in ["3.10.14", "3.12.4"] {
+    fill(".pyenv/versions/\(version)/lib", 300 * MB, with: 8 * MB) { "python-\($0).so" }
+}
+try "3.12.4\n".write(toFile: home + "/.pyenv/version", atomically: true, encoding: .utf8)
+
 // MARK: Downloads, with a few true duplicates
 
 for (name, size) in [("Xcode_16.1.xip", 2 * GB), ("ubuntu-24.04.1-desktop-arm64.iso", 2 * GB), ("旅行素材.zip", 2 * GB),

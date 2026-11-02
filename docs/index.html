@@ -231,7 +231,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="eyebrow">DiskLens · 磁盘空间分析</p>
       <h1>看清<span class="grad">每一 GB</span><br>的去向。</h1>
       <p class="lede">原生速度扫完整块磁盘，把空间画成一张可以放大的地图，再告诉你哪些能放心删掉、删了会怎样。</p>
-      <div class="hero-meta"><span>预览版 0.2.4 已发布</span><span>原生 macOS 应用</span><span>数据只留在你的 Mac 上</span><span>macOS 14 及以上</span></div>
+      <div class="hero-meta"><span>预览版 0.2.5 已发布</span><span>原生 macOS 应用</span><span>数据只留在你的 Mac 上</span><span>macOS 14 及以上</span></div>
 
       <div class="window" role="group" aria-label="DiskLens 演示窗口">
         <div class="titlebar">
@@ -343,15 +343,15 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <div class="wrap">
       <div class="head lift">
         <p class="eyebrow">开发环境</p>
-        <h2 class="h2">Xcode、Docker、Gradle，<br>哪些还在用，一目了然。</h2>
-        <p class="lede">开发工具往往是 Mac 上最大的隐形占用。DiskLens 找出装了哪些版本、模拟器、镜像和缓存，标出哪些正在用、哪些已经没人用，再用工具自己的命令把它们删掉。</p>
+        <h2 class="h2">Xcode、Docker、Node、AI 模型，<br>哪些还在用，一目了然。</h2>
+        <p class="lede">开发工具往往是 Mac 上最大的隐形占用。DiskLens 检查 11 类工具：Xcode 与模拟器、Android、Docker、AI 模型、Homebrew、Node.js、Python、Java、Go、Rust、Ruby。找出装了哪些版本、模拟器、镜像、模型和缓存，标出哪些正在用、哪些已经没人用，再用工具自己的命令把它们删掉。</p>
       </div>
       <figure class="shot lift">
-        <img src="img/devtools.jpg" width="2000" height="1250" alt="开发环境页面：按 Xcode 与模拟器、Docker、Java、Go 分组，标出哪些还在用、哪些已经不用" decoding="async" loading="lazy">
+        <img src="img/devtools.jpg" width="2000" height="1250" alt="开发环境页面：按 Xcode 与模拟器、Android、Docker、AI 模型等分组，标出哪些还在用、哪些已经不用" decoding="async" loading="lazy">
       </figure>
       <div class="facts lift">
-        <div><b>知道还在不在用</b><span>当前选中的 Xcode、默认的 JDK、每台设备最新的调试符号、项目还在的编译缓存，都会标出来。</span></div>
-        <div><b>用工具自己的命令</b><span>模拟器用 simctl，镜像用 docker，Homebrew 用 brew cleanup；运行前先给你看完整的命令。</span></div>
+        <div><b>知道还在不在用</b><span>默认的 Xcode、JDK、Node、Python；项目里 .nvmrc、.python-version 指定的版本；有模拟器在用的系统映像，都会标出来。</span></div>
+        <div><b>用工具自己的命令</b><span>模拟器用 simctl，镜像用 docker，Python 用 pyenv，模型用 ollama rm；运行前先给你看完整的命令。</span></div>
         <div><b>删了也有记录</b><span>每次清理都记进清理记录，普通文件夹照旧移到废纸篓，可以放回。</span></div>
       </div>
     </div>
@@ -417,7 +417,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <h2 class="h2 lift">DiskLens<br><span class="grad">预览版已发布。</span></h2>
       <p class="lede">支持 macOS 14 Sonoma 及以上，Apple 芯片和 Intel 机型都能用。预览版还没有经过苹果公证，第一次打开时请按住 Control 点按 DiskLens，选「打开」。</p>
       <div class="cta-row">
-        <a class="primary" href="https://github.com/calabli/DiskLens/releases/latest" target="_blank" rel="noopener">下载 0.2.4</a>
+        <a class="primary" href="https://github.com/calabli/DiskLens/releases/latest" target="_blank" rel="noopener">下载最新版</a>
         <a class="secondary" href="https://github.com/calabli/DiskLens" target="_blank" rel="noopener">在 GitHub 上查看</a>
       </div>
     </div>
