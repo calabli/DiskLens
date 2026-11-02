@@ -71,8 +71,8 @@ final class TrashWatcher {
 
     private func notify(_ footprint: AppFootprint) {
         let content = UNMutableNotificationContent()
-        content.title = "\(footprint.app.name) 还留下了 \(ByteFormat.string(footprint.dataSize)) 数据"
-        content.body = "应用已移到废纸篓，但它的缓存、设置和数据还在。打开 DiskLens 一起清理。"
+        content.title = L("\(footprint.app.name) 还留下了 \(ByteFormat.string(footprint.dataSize)) 数据")
+        content.body = L("应用已移到废纸篓，但它的缓存、设置和数据还在。打开 DiskLens 一起清理。")
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 }

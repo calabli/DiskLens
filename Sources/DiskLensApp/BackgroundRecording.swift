@@ -30,8 +30,8 @@ final class BackgroundRecording {
             }
         } catch {
             errorMessage = on
-                ? "没能开启后台记录：\(error.localizedDescription)"
-                : "没能关闭后台记录：\(error.localizedDescription)"
+                ? L("没能开启后台记录：\(error.localizedDescription)")
+                : L("没能关闭后台记录：\(error.localizedDescription)")
         }
         refresh()
         if status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }

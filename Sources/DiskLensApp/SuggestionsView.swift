@@ -146,7 +146,7 @@ private struct SuggestionRow: View {
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     if !running.isEmpty {
-                        Label("\(running.map(model.appName).joined(separator: "、")) 正在运行，请先退出再清理",
+                        Label("\(running.map(model.appName).joined(separator: L("、"))) 正在运行，请先退出再清理",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.callout)
                             .foregroundStyle(.orange)
@@ -167,7 +167,7 @@ private struct SuggestionRow: View {
                             .foregroundStyle(.secondary)
                     }
                     if suggestion.action == .trash {
-                        Button(pending.isEmpty ? "已在收集筐中" : "加入收集筐") {
+                        Button(pending.isEmpty ? L("已在收集筐中") : L("加入收集筐")) {
                             model.addToBasket(pending)
                         }
                         .disabled(pending.isEmpty || !running.isEmpty)
@@ -210,7 +210,7 @@ private struct ItemRow: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(inBasket)
-                .help(inBasket ? "已在收集筐中" : "加入收集筐")
+                .help(inBasket ? L("已在收集筐中") : L("加入收集筐"))
             }
         }
         .padding(.leading, 38)
@@ -239,7 +239,7 @@ private struct CommandLine: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
-            Button(copied ? "已拷贝" : "拷贝命令") {
+            Button(copied ? L("已拷贝") : L("拷贝命令")) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(command, forType: .string)
                 copied = true
@@ -253,17 +253,17 @@ private struct CommandLine: View {
 extension CleanupSafety {
     var title: String {
         switch self {
-        case .safe: "可放心清理"
-        case .review: "建议检查"
-        case .info: "仅供参考"
+        case .safe: L("可放心清理")
+        case .review: L("建议检查")
+        case .info: L("仅供参考")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .safe: "缓存和可以自动重建的内容"
-        case .review: "可能还有用，请逐项确认"
-        case .info: "不宜直接删除文件，按说明处理"
+        case .safe: L("缓存和可以自动重建的内容")
+        case .review: L("可能还有用，请逐项确认")
+        case .info: L("不宜直接删除文件，按说明处理")
         }
     }
 

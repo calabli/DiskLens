@@ -55,16 +55,16 @@ struct MenuBarContent: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 2) {
-                MenuButton(title: "打开 DiskLens", symbol: "macwindow") { show(nil) }
-                MenuButton(title: "扫描主目录", symbol: "house") {
+                MenuButton(title: L("打开 DiskLens"), symbol: "macwindow") { show(nil) }
+                MenuButton(title: L("扫描主目录"), symbol: "house") {
                     show(.overview)
                     model.scan(AppModel.homePath)
                 }
-                MenuButton(title: "清理建议", symbol: "sparkles") {
+                MenuButton(title: L("清理建议"), symbol: "sparkles") {
                     show(.cleanup)
                     if model.tree == nil { model.scan(AppModel.homePath) }
                 }
-                MenuButton(title: "空间时间线", symbol: "chart.bar.xaxis") {
+                MenuButton(title: L("空间时间线"), symbol: "chart.bar.xaxis") {
                     show(.timeline)
                     if model.tree == nil { model.scan(AppModel.homePath) }
                 }
@@ -145,9 +145,27 @@ struct SettingsView: View {
     @AppStorage(SpaceMonitor.Keys.lowSpaceAlerts) private var lowSpaceAlerts = true
     @AppStorage(SpaceMonitor.Keys.lowSpaceThreshold) private var threshold = 20
     @AppStorage(SpaceMonitor.Keys.growthAlerts) private var growthAlerts = true
+    @State private var language = InterfaceLanguage.chosen
 
     var body: some View {
         Form {
+            Section {
+                Picker("界面语言", selection: $language) {
+                    Text("跟随系统").tag(InterfaceLanguage.system)
+                    Text(verbatim: "简体中文").tag(InterfaceLanguage.chinese) // l10n: ignore
+                    Text(verbatim: "English").tag(InterfaceLanguage.english)
+                }
+                if language != InterfaceLanguage.chosenAtLaunch {
+                    HStack {
+                        Text("重新打开 DiskLens 后生效。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("立即重新打开") { AppUpdater.relaunch(Bundle.main.bundleURL) }
+                    }
+                }
+            }
+            .onChange(of: language) { InterfaceLanguage.chosen = language }
             Section("权限") {
                 LabeledContent("完全磁盘访问权限") {
                     if access.isGranted {
@@ -161,7 +179,7 @@ struct SettingsView: View {
                 }
                 if let agent = access.agentStatus {
                     LabeledContent("后台助手") {
-                        Text(agent == .granted ? "已开启" : "未开启，受保护文件夹的变化不会被记录")
+                        Text(agent == .granted ? L("已开启") : L("未开启，受保护文件夹的变化不会被记录"))
                             .foregroundStyle(agent == .granted ? Color.green : Color.secondary)
                     }
                 }
@@ -180,7 +198,7 @@ struct SettingsView: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(AppUpdater.versionLabel)
                         if let date = AppUpdater.buildDate {
-                            Text("编译于 " + date.formatted(date: .abbreviated, time: .shortened))
+                            Text(L("编译于 ") + date.formatted(date: .abbreviated, time: .shortened))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -189,7 +207,7 @@ struct SettingsView: View {
                 Toggle("自动检查更新", isOn: $autoCheckUpdates)
                 Toggle("包括预览版", isOn: $includePrereleases)
                 HStack {
-                    Text(updater.lastCheck.map { "上次检查：" + $0.formatted(.relative(presentation: .named)) } ?? "还没有检查过")
+                    Text(updater.lastCheck.map { L("上次检查：") + $0.formatted(.relative(presentation: .named)) } ?? L("还没有检查过"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -201,7 +219,7 @@ struct SettingsView: View {
             }
             Section("清理规则") {
                 LabeledContent("当前版本") {
-                    Text(rules.set.map { "第 \($0.version) 版 · \($0.rules.count) 条规则" } ?? "没能加载")
+                    Text(rules.set.map { L("第 \($0.version) 版 · \($0.rules.count) 条规则") } ?? L("没能加载"))
                 }
                 Toggle("自动更新清理规则", isOn: $autoUpdateRules)
                 HStack {
@@ -241,13 +259,36 @@ struct SettingsView: View {
 private extension SettingsView {
     var ruleStatus: String {
         switch rules.status {
-        case .checking: return "正在检查…"
-        case let .updated(version): return "已更新到第 \(version) 版"
-        case .upToDate: return "已是最新"
+        case .checking: return L("正在检查…")
+        case let .updated(version): return L("已更新到第 \(version) 版")
+        case .upToDate: return L("已是最新")
         case let .failed(reason): return reason
         case .idle:
-            guard let last = rules.lastCheck else { return "还没有检查过" }
-            return "上次检查：" + last.formatted(.relative(presentation: .named))
+            guard let last = rules.lastCheck else { return L("还没有检查过") }
+            return L("上次检查：") + last.formatted(.relative(presentation: .named))
+        }
+    }
+}
+
+/// The interface language: the system's, or one picked in Settings. macOS reads the
+/// app's own AppleLanguages default at launch, so a change applies after reopening.
+enum InterfaceLanguage: String {
+    case system, chinese = "zh-Hans", english = "en"
+
+    static let chosenAtLaunch = chosen
+
+    static var chosen: InterfaceLanguage {
+        get {
+            let domain = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+            let first = (domain?["AppleLanguages"] as? [String])?.first
+            return first.flatMap(InterfaceLanguage.init(rawValue:)) ?? .system
+        }
+        set {
+            if newValue == .system {
+                UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+            } else {
+                UserDefaults.standard.set([newValue.rawValue], forKey: "AppleLanguages")
+            }
         }
     }
 }

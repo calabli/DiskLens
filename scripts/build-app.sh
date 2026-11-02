@@ -53,6 +53,8 @@ PLIST
 # Resources of the core library, such as the cleanup rules (found through Bundle.module).
 cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
 cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Interface languages: the Chinese text in the code is the key, en.lproj translates it.
+cp -R Localization/*.lproj "$APP/Contents/Resources/"
 
 # Version from VERSION; the build number counts commits, so every release is higher.
 VERSION="$(tr -d '[:space:]' < VERSION)"
@@ -91,7 +93,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh-Hans</string>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>zh-Hans</string>
+        <string>en</string>
+    </array>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

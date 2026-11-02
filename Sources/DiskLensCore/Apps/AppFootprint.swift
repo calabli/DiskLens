@@ -84,7 +84,7 @@ public struct AppFootprintFinder: Sendable {
 
     public func footprint(of app: InstalledApp) -> AppFootprint {
         var files: [AppFile] = [AppFile(path: app.path, size: sizeOf(app.path), kind: .app, confidence: .certain,
-                                        requiresAdmin: false, reason: "应用本身")]
+                                        requiresAdmin: false, reason: L("应用本身"))]
         var seen = Set([app.path])
         func add(_ path: String, _ kind: AppFile.Kind, _ confidence: AppFile.Confidence, _ reason: String, admin: Bool = false) {
             guard seen.insert(path).inserted else { return }
@@ -102,9 +102,9 @@ public struct AppFootprintFinder: Sendable {
         for (folder, kind) in byID {
             for name in Self.list(library + "/" + folder) {
                 if matchesID(name, of: app) {
-                    add(library + "/" + folder + "/" + name, kind, .certain, "名称与应用标识一致")
+                    add(library + "/" + folder + "/" + name, kind, .certain, L("名称与应用标识一致"))
                 } else if [.support, .caches, .logs].contains(kind), matchesName(name, of: app) {
-                    add(library + "/" + folder + "/" + name, kind, .likely, "名称与应用名称一致")
+                    add(library + "/" + folder + "/" + name, kind, .likely, L("名称与应用名称一致"))
                 }
             }
         }
@@ -114,7 +114,7 @@ public struct AppFootprintFinder: Sendable {
             for vendor in Self.list(library + "/" + folder) where vendorNames(of: app).contains(vendor.lowercased()) {
                 for name in Self.list(library + "/" + folder + "/" + vendor) where shortNames(of: app).contains(name.lowercased()) {
                     add(library + "/" + folder + "/" + vendor + "/" + name, folder == "Caches" ? .caches : .support,
-                        .likely, "开发商文件夹里以应用命名的文件夹")
+                        .likely, L("开发商文件夹里以应用命名的文件夹"))
                 }
             }
         }
@@ -122,14 +122,14 @@ public struct AppFootprintFinder: Sendable {
         for name in Self.list(library + "/Group Containers") {
             if let confidence = groupContainerMatch(name, of: app) {
                 add(library + "/Group Containers/" + name, .groupContainer, confidence,
-                    confidence == .certain ? "共享容器的标识属于这个应用" : "开发者团队相同")
+                    confidence == .certain ? L("共享容器的标识属于这个应用") : L("开发者团队相同"))
             }
         }
 
         if let executable = app.executableName {
             for name in Self.list(library + "/Logs/DiagnosticReports")
             where name.hasPrefix(executable + "-") || name.hasPrefix(executable + "_") {
-                add(library + "/Logs/DiagnosticReports/" + name, .crashReports, .certain, "这个应用的崩溃报告")
+                add(library + "/Logs/DiagnosticReports/" + name, .crashReports, .certain, L("这个应用的崩溃报告"))
             }
         }
 
@@ -139,12 +139,12 @@ public struct AppFootprintFinder: Sendable {
                 let path = folder + "/" + name
                 if let confidence = launchItemMatch(path, of: app) {
                     add(path, admin ? .systemLaunchItem : .launchAgent, confidence,
-                        confidence == .certain ? "随应用启动的后台程序" : "同一开发商的后台程序", admin: admin)
+                        confidence == .certain ? L("随应用启动的后台程序") : L("同一开发商的后台程序"), admin: admin)
                 }
             }
         }
         for name in Self.list(systemLibrary + "/PrivilegedHelperTools") where matchesID(name, of: app) {
-            add(systemLibrary + "/PrivilegedHelperTools/" + name, .privilegedHelper, .certain, "以管理员身份运行的辅助程序", admin: true)
+            add(systemLibrary + "/PrivilegedHelperTools/" + name, .privilegedHelper, .certain, L("以管理员身份运行的辅助程序"), admin: true)
         }
 
         if includeInstallerReceipts {
@@ -244,7 +244,7 @@ public struct AppFootprintFinder: Sendable {
     private func installerReceipts(of app: InstalledApp) -> [(path: String, confidence: AppFile.Confidence, reason: String)] {
         guard let output = Self.run("/usr/sbin/pkgutil", ["--pkgs"]) else { return [] }
         return output.split(separator: "\n").map(String.init).compactMap { pkg in
-            matchesID(pkg, of: app) ? ("pkg:" + pkg, .certain, "安装包记录") : nil
+            matchesID(pkg, of: app) ? ("pkg:" + pkg, .certain, L("安装包记录")) : nil
         }
     }
 

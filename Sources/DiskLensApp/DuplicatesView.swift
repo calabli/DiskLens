@@ -71,7 +71,7 @@ struct DuplicatesView: View {
             if model.isFindingDuplicates {
                 Button("取消") { model.cancelFindingDuplicates() }
             } else {
-                Button(hasResults ? "重新查找" : "开始查找", action: search)
+                Button(hasResults ? L("重新查找") : L("开始查找"), action: search)
                     .buttonStyle(.borderedProminent)
                     .tint(needsNewSearch || !hasResults ? .accentColor : .secondary)
             }
@@ -153,7 +153,7 @@ struct DuplicatesView: View {
         return List {
             HStack(alignment: .center, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(groups.isEmpty ? "没有符合条件的重复文件" : "\(groups.count) 组重复文件，可释放 \(ByteFormat.string(reclaimable))")
+                    Text(groups.isEmpty ? L("没有符合条件的重复文件") : L("\(groups.count) 组重复文件，可释放 \(ByteFormat.string(reclaimable))"))
                         .font(.title2.weight(.semibold))
                         .monospacedDigit()
                     Text("每组的第一份会保留；可以在组里改选要保留的那份。")
@@ -220,7 +220,7 @@ private struct GroupRow: View {
                 Text(ByteFormat.string(group.reclaimable))
                     .fontWeight(.semibold)
                     .monospacedDigit()
-                Button(extras.isEmpty ? "已在收集筐中" : "其余加入收集筐") {
+                Button(extras.isEmpty ? L("已在收集筐中") : L("其余加入收集筐")) {
                     extras.forEach { model.addToBasket($0.node) }
                 }
                 .disabled(extras.isEmpty)

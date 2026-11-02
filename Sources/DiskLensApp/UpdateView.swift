@@ -27,17 +27,17 @@ struct UpdateView: View {
 
     private var title: String {
         switch updater.state {
-        case .checking: "正在检查更新…"
-        case .upToDate: "DiskLens 已是最新版本"
+        case .checking: L("正在检查更新…")
+        case .upToDate: L("DiskLens 已是最新版本")
         case let .available(update), let .downloading(update, _), let .installing(update):
-            "DiskLens \(update.version) 可以更新了"
-        case .failed: "更新没能完成"
-        case .idle: "软件更新"
+            L("DiskLens \(update.version) 可以更新了")
+        case .failed: L("更新没能完成")
+        case .idle: L("软件更新")
         }
     }
 
     private var subtitle: String {
-        "你现在用的是 \(AppUpdater.versionLabel)"
+        L("你现在用的是 \(AppUpdater.versionLabel)")
     }
 
     @ViewBuilder
@@ -136,12 +136,12 @@ enum AboutPanel {
     static func show() {
         var lines: [String] = []
         if let date = AppUpdater.buildDate {
-            lines.append("编译时间：" + date.formatted(.dateTime.year().month().day().hour().minute().second()))
+            lines.append(L("编译时间：") + date.formatted(.dateTime.year().month().day().hour().minute().second()))
         }
         if let commit = AppUpdater.commit {
-            lines.append("代码版本：" + commit)
+            lines.append(L("代码版本：") + commit)
         }
-        lines.append("数据只留在你的 Mac 上。")
+        lines.append(L("数据只留在你的 Mac 上。"))
         let style = NSMutableParagraphStyle()
         style.alignment = .center
         let credits = NSAttributedString(string: lines.joined(separator: "\n"), attributes: [
@@ -170,7 +170,7 @@ enum UpdateWindow {
             if window == nil {
                 let hosting = NSHostingController(rootView: UpdateView().environment(updater))
                 let window = NSWindow(contentViewController: hosting)
-                window.title = "软件更新"
+                window.title = L("软件更新")
                 window.styleMask = [.titled, .closable]
                 window.isReleasedWhenClosed = false
                 window.delegate = closer

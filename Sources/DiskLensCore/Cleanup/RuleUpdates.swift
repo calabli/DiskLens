@@ -17,9 +17,9 @@ public enum SignedRules {
 
         public var description: String {
             switch self {
-            case .badSignature: "签名不对，规则可能被改动过"
-            case let .unreadable(reason): "规则文件读不懂：\(reason)"
-            case let .invalid(problems): "规则没通过检查：" + problems.prefix(3).joined(separator: "；")
+            case .badSignature: L("签名不对，规则可能被改动过")
+            case let .unreadable(reason): L("规则文件读不懂：\(reason)")
+            case let .invalid(problems): L("规则没通过检查：") + problems.prefix(3).joined(separator: L("；"))
             }
         }
     }
@@ -64,15 +64,15 @@ public enum RuleValidator {
         var problems: [String] = []
         var ids = Set<String>()
         for rule in set.rules {
-            if !ids.insert(rule.id).inserted { problems.append("\(rule.id)：id 重复") }
-            if rule.paths.isEmpty && rule.command == nil { problems.append("\(rule.id)：没有路径") }
+            if !ids.insert(rule.id).inserted { problems.append(L("\(rule.id)：id 重复")) }
+            if rule.paths.isEmpty && rule.command == nil { problems.append(L("\(rule.id)：没有路径")) }
             for path in rule.paths {
-                if let problem = problem(withPath: path) { problems.append("\(rule.id)：\(path) \(problem)") }
+                if let problem = problem(withPath: path) { problems.append(L("\(rule.id)：\(path) \(problem)")) }
             }
             if let command = rule.command {
                 let program = command.split(separator: " ").first.map(String.init) ?? ""
                 if !allowedPrograms.contains(program) || command.contains(where: { ";|&`$<>\n".contains($0) }) {
-                    problems.append("\(rule.id)：命令不在允许范围内")
+                    problems.append(L("\(rule.id)：命令不在允许范围内"))
                 }
             }
         }
@@ -81,19 +81,19 @@ public enum RuleValidator {
 
     /// Why `path` is not allowed in a rule, or nil if it is.
     public static func problem(withPath path: String) -> String? {
-        guard path.hasPrefix("~/") else { return "必须在个人文件夹里（以 ~/ 开头）" }
+        guard path.hasPrefix("~/") else { return L("必须在个人文件夹里（以 ~/ 开头）") }
         let parts = path.dropFirst(2).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." || $0.contains("**") }) {
-            return "含有空的、. 或 .. 的路径段"
+            return L("含有空的、. 或 .. 的路径段")
         }
         let first = parts[0]
-        if first.contains(where: { "*?[".contains($0) }) { return "第一层不能用通配符" }
-        if personalFolders.contains(first) { return "指向个人文件" }
-        if parts.count == 1 && path != "~/.Trash" { return "范围太大" }
+        if first.contains(where: { "*?[".contains($0) }) { return L("第一层不能用通配符") }
+        if personalFolders.contains(first) { return L("指向个人文件") }
+        if parts.count == 1 && path != "~/.Trash" { return L("范围太大") }
         if first == "Library" && (parts.count < 3 || parts[1].contains(where: { "*?[".contains($0) })) {
-            return "在资源库里范围太大"
+            return L("在资源库里范围太大")
         }
-        if parts.count == 2 && parts[1] == "*" { return "会匹配整个文件夹的所有内容" }
+        if parts.count == 2 && parts[1] == "*" { return L("会匹配整个文件夹的所有内容") }
         return nil
     }
 }

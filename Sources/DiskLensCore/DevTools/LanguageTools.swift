@@ -34,27 +34,27 @@ enum NodeTools {
         }
 
         for (path, title, command, program) in [
-            (context.home + "/.npm/_cacache", "npm 缓存", ["cache", "clean", "--force"], "npm"),
-            (context.home + "/Library/pnpm/store", "pnpm 存储", ["store", "prune"], "pnpm"),
-            (context.home + "/Library/Caches/Yarn", "Yarn 缓存", ["cache", "clean"], "yarn"),
+            (context.home + "/.npm/_cacache", L("npm 缓存"), ["cache", "clean", "--force"], "npm"),
+            (context.home + "/Library/pnpm/store", L("pnpm 存储"), ["store", "prune"], "pnpm"),
+            (context.home + "/Library/Caches/Yarn", L("Yarn 缓存"), ["cache", "clean"], "yarn"),
         ] {
             guard let size = context.size(of: path), size > 0 else { continue }
             let tool = ToolCommand(program, command)
-            items.append(DevItem(id: "node:" + path, ecosystem: .node, kind: "缓存", title: title, detail: path.abbreviatingHome,
-                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable("可以重新下载"),
+            items.append(DevItem(id: "node:" + path, ecosystem: .node, kind: L("缓存"), title: title, detail: path.abbreviatingHome,
+                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable(L("可以重新下载")),
                                  removal: tool.isInstalled ? .command(tool) : .trash(path),
-                                 consequence: "下次安装依赖时会重新下载，第一次会慢一些。"))
+                                 consequence: L("下次安装依赖时会重新下载，第一次会慢一些。")))
         }
         return DevGroup(ecosystem: .node, items: items)
     }
 
     private static func versionItem(_ manager: String, _ version: String, _ path: String, isDefault: Bool,
                                     wanted: [String], _ context: DevContext) -> DevItem {
-        DevItem(id: "node:\(manager):" + path, ecosystem: .node, kind: "Node 版本", title: "Node \(version)",
-                detail: "由 \(manager) 安装", path: path, size: context.size(of: path), lastUsed: context.modified(path),
+        DevItem(id: "node:\(manager):" + path, ecosystem: .node, kind: L("Node 版本"), title: "Node \(version)",
+                detail: L("由 \(manager) 安装"), path: path, size: context.size(of: path), lastUsed: context.modified(path),
                 usage: context.usage(of: version, isDefault: isDefault, wanted: wanted),
                 removal: .trash(path),
-                consequence: "这个版本的 Node 和全局装在它下面的命令行工具会被移到废纸篓；需要时用 \(manager) 重新安装。")
+                consequence: L("这个版本的 Node 和全局装在它下面的命令行工具会被移到废纸篓；需要时用 \(manager) 重新安装。"))
     }
 }
 
@@ -69,11 +69,11 @@ enum PythonTools {
         let hasPyenv = ToolCommand("pyenv", []).isInstalled
         for path in context.subfolders(of: pyenv + "/versions") {
             let version = (path as NSString).lastPathComponent
-            items.append(DevItem(id: "pyenv:" + path, ecosystem: .python, kind: "Python 版本", title: "Python \(version)",
-                                 detail: "由 pyenv 安装", path: path, size: context.size(of: path), lastUsed: context.modified(path),
+            items.append(DevItem(id: "pyenv:" + path, ecosystem: .python, kind: L("Python 版本"), title: "Python \(version)",
+                                 detail: L("由 pyenv 安装"), path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                  usage: context.usage(of: version, isDefault: version == global, wanted: wanted),
                                  removal: hasPyenv ? .command(ToolCommand("pyenv", ["uninstall", "-f", version])) : .trash(path),
-                                 consequence: "这个版本的 Python 和装在它里面的包会被删除；需要时用 pyenv install 重新安装。"))
+                                 consequence: L("这个版本的 Python 和装在它里面的包会被删除；需要时用 pyenv install 重新安装。")))
         }
 
         for base in ["miniconda3", "anaconda3", "miniforge3", "mambaforge", "opt/anaconda3", "opt/miniconda3"].map({ context.home + "/" + $0 }) {
@@ -82,29 +82,29 @@ enum PythonTools {
             let name = (base as NSString).lastPathComponent
             for path in context.subfolders(of: base + "/envs") {
                 let env = (path as NSString).lastPathComponent
-                items.append(DevItem(id: "conda:" + path, ecosystem: .python, kind: "conda 环境", title: env,
-                                     detail: "\(name) 的环境", path: path, size: context.size(of: path), lastUsed: context.modified(path),
+                items.append(DevItem(id: "conda:" + path, ecosystem: .python, kind: L("conda 环境"), title: env,
+                                     detail: L("\(name) 的环境"), path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                      removal: .command(ToolCommand(conda, ["env", "remove", "-y", "-p", path])),
-                                     consequence: "这个环境和装在里面的包会被删除；依赖它的项目需要重新创建环境。"))
+                                     consequence: L("这个环境和装在里面的包会被删除；依赖它的项目需要重新创建环境。")))
             }
             let pkgs = base + "/pkgs"
             if let size = context.size(of: pkgs), size > 0 {
-                items.append(DevItem(id: "conda:pkgs:" + base, ecosystem: .python, kind: "缓存", title: "\(name) 包缓存",
-                                     detail: pkgs.abbreviatingHome, path: pkgs, size: size, usage: .regenerable("可以重新下载"),
+                items.append(DevItem(id: "conda:pkgs:" + base, ecosystem: .python, kind: L("缓存"), title: L("\(name) 包缓存"),
+                                     detail: pkgs.abbreviatingHome, path: pkgs, size: size, usage: .regenerable(L("可以重新下载")),
                                      removal: .command(ToolCommand(conda, ["clean", "--all", "-y"])),
-                                     consequence: "只清理下载过的安装包和用不到的旧包，已有的环境不受影响。"))
+                                     consequence: L("只清理下载过的安装包和用不到的旧包，已有的环境不受影响。")))
             }
         }
 
         for (path, title, tool) in [
-            (context.home + "/Library/Caches/pip", "pip 缓存", ToolCommand("pip3", ["cache", "purge"])),
-            (context.home + "/.cache/uv", "uv 缓存", ToolCommand("uv", ["cache", "clean"])),
+            (context.home + "/Library/Caches/pip", L("pip 缓存"), ToolCommand("pip3", ["cache", "purge"])),
+            (context.home + "/.cache/uv", L("uv 缓存"), ToolCommand("uv", ["cache", "clean"])),
         ] {
             guard let size = context.size(of: path), size > 0 else { continue }
-            items.append(DevItem(id: "python:" + path, ecosystem: .python, kind: "缓存", title: title, detail: path.abbreviatingHome,
-                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable("可以重新下载"),
+            items.append(DevItem(id: "python:" + path, ecosystem: .python, kind: L("缓存"), title: title, detail: path.abbreviatingHome,
+                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable(L("可以重新下载")),
                                  removal: tool.isInstalled ? .command(tool) : .trash(path),
-                                 consequence: "下次安装包时会重新下载。"))
+                                 consequence: L("下次安装包时会重新下载。")))
         }
         return DevGroup(ecosystem: .python, items: items)
     }
@@ -119,20 +119,20 @@ enum RubyTools {
         let hasRbenv = ToolCommand("rbenv", []).isInstalled
         for path in context.subfolders(of: context.home + "/.rbenv/versions") {
             let version = (path as NSString).lastPathComponent
-            items.append(DevItem(id: "rbenv:" + path, ecosystem: .ruby, kind: "Ruby 版本", title: "Ruby \(version)",
-                                 detail: "由 rbenv 安装", path: path, size: context.size(of: path), lastUsed: context.modified(path),
+            items.append(DevItem(id: "rbenv:" + path, ecosystem: .ruby, kind: L("Ruby 版本"), title: "Ruby \(version)",
+                                 detail: L("由 rbenv 安装"), path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                  usage: context.usage(of: version, isDefault: version == global, wanted: wanted),
                                  removal: hasRbenv ? .command(ToolCommand("rbenv", ["uninstall", "-f", version])) : .trash(path),
-                                 consequence: "这个版本的 Ruby 和装在它下面的 gem 会被删除；需要时用 rbenv install 重新安装。"))
+                                 consequence: L("这个版本的 Ruby 和装在它下面的 gem 会被删除；需要时用 rbenv install 重新安装。")))
         }
         let rvmDefault = try? FileManager.default.destinationOfSymbolicLink(atPath: context.home + "/.rvm/rubies/default")
         for path in context.subfolders(of: context.home + "/.rvm/rubies") where !path.hasSuffix("/default") {
             let name = (path as NSString).lastPathComponent
-            items.append(DevItem(id: "rvm:" + path, ecosystem: .ruby, kind: "Ruby 版本", title: name, detail: "由 RVM 安装",
+            items.append(DevItem(id: "rvm:" + path, ecosystem: .ruby, kind: L("Ruby 版本"), title: name, detail: L("由 RVM 安装"),
                                  path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                  usage: context.usage(of: name, isDefault: rvmDefault?.hasSuffix(name) ?? false, wanted: wanted),
                                  removal: .trash(path),
-                                 consequence: "这个版本的 Ruby 会被移到废纸篓；需要时用 rvm install 重新安装。"))
+                                 consequence: L("这个版本的 Ruby 会被移到废纸篓；需要时用 rvm install 重新安装。")))
         }
         return DevGroup(ecosystem: .ruby, items: items)
     }
@@ -152,19 +152,19 @@ enum RustTools {
             // "1.75.0-aarch64-apple-darwin" or "stable-aarch64-apple-darwin": projects name the part before the target.
             let channel = name.components(separatedBy: "-").first ?? name
             let projects = wanted.filter { $0 == channel || name.hasPrefix($0 + "-") }.count
-            let usage: DevItem.Usage = name == defaultToolchain ? .active("当前默认")
-                : projects > 0 ? .used("\(projects) 个项目在用")
-                : context.tree == nil ? .unknown : .unused("扫描范围内没有项目指定它")
-            items.append(DevItem(id: "rustup:" + path, ecosystem: .rust, kind: "工具链", title: name, path: path,
+            let usage: DevItem.Usage = name == defaultToolchain ? .active(L("当前默认"))
+                : projects > 0 ? .used(L("\(projects) 个项目在用"))
+                : context.tree == nil ? .unknown : .unused(L("扫描范围内没有项目指定它"))
+            items.append(DevItem(id: "rustup:" + path, ecosystem: .rust, kind: L("工具链"), title: name, path: path,
                                  size: context.size(of: path), lastUsed: context.modified(path), usage: usage,
                                  removal: rustup.isInstalled ? .command(ToolCommand("rustup", ["toolchain", "uninstall", name])) : .trash(path),
-                                 consequence: "这个工具链会被删除；需要时 rustup 会重新下载。"))
+                                 consequence: L("这个工具链会被删除；需要时 rustup 会重新下载。")))
         }
-        for (path, title) in [(context.home + "/.cargo/registry", "Cargo 依赖缓存"), (context.home + "/.cargo/git", "Cargo Git 依赖")] {
+        for (path, title) in [(context.home + "/.cargo/registry", L("Cargo 依赖缓存")), (context.home + "/.cargo/git", L("Cargo Git 依赖"))] {
             guard let size = context.size(of: path), size > 0 else { continue }
-            items.append(DevItem(id: "cargo:" + path, ecosystem: .rust, kind: "缓存", title: title, detail: path.abbreviatingHome,
-                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable("可以重新下载"),
-                                 removal: .trash(path), consequence: "下次编译时会重新下载依赖。"))
+            items.append(DevItem(id: "cargo:" + path, ecosystem: .rust, kind: L("缓存"), title: title, detail: path.abbreviatingHome,
+                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable(L("可以重新下载")),
+                                 removal: .trash(path), consequence: L("下次编译时会重新下载依赖。")))
         }
         return DevGroup(ecosystem: .rust, items: items)
     }

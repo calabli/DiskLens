@@ -67,7 +67,7 @@ final class RuleLibrary {
             } catch let failure as SignedRules.Failure {
                 status = .failed(failure.description)
             } catch {
-                status = .failed("没能连上规则服务器")
+                status = .failed(L("没能连上规则服务器"))
             }
         }
     }

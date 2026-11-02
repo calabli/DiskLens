@@ -218,7 +218,7 @@ private struct AppDetail: View {
                                 .textSelection(.enabled)
                                 .padding(8)
                                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
-                            Button(copied ? "已拷贝" : "拷贝命令") {
+                            Button(copied ? L("已拷贝") : L("拷贝命令")) {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(command, forType: .string)
                                 copied = true
@@ -250,7 +250,7 @@ private struct AppDetail: View {
                     .frame(width: 56, height: 56)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(app.name).font(.title2.weight(.semibold))
-                    Text([app.version.map { "版本 \($0)" }, app.bundleID].compactMap { $0 }.joined(separator: " · "))
+                    Text([app.version.map { L("版本 \($0)") }, app.bundleID].compactMap { $0 }.joined(separator: " · "))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -364,21 +364,21 @@ private struct AppDetail: View {
 extension AppFile.Kind {
     var title: String {
         switch self {
-        case .app: "应用"
-        case .container: "沙盒容器"
-        case .groupContainer: "共享容器"
-        case .support: "应用数据"
-        case .caches: "缓存"
-        case .preferences: "设置"
-        case .savedState: "窗口状态"
-        case .webData: "网页数据"
-        case .logs: "日志"
-        case .crashReports: "崩溃报告"
-        case .scripts: "脚本"
-        case .launchAgent: "后台程序"
-        case .systemLaunchItem: "系统级后台程序（需要管理员）"
-        case .privilegedHelper: "辅助工具（需要管理员）"
-        case .installedFiles: "安装记录（需要管理员）"
+        case .app: L("应用")
+        case .container: L("沙盒容器")
+        case .groupContainer: L("共享容器")
+        case .support: L("应用数据")
+        case .caches: L("缓存")
+        case .preferences: L("设置")
+        case .savedState: L("窗口状态")
+        case .webData: L("网页数据")
+        case .logs: L("日志")
+        case .crashReports: L("崩溃报告")
+        case .scripts: L("脚本")
+        case .launchAgent: L("后台程序")
+        case .systemLaunchItem: L("系统级后台程序（需要管理员）")
+        case .privilegedHelper: L("辅助工具（需要管理员）")
+        case .installedFiles: L("安装记录（需要管理员）")
         }
     }
 }

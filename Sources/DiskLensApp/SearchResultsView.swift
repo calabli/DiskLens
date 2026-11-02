@@ -91,11 +91,11 @@ struct SearchResultsView: View {
     }
 
     private var summary: String {
-        guard let result = model.searchResult else { return "正在搜索…" }
-        if result.total == 0 { return model.isSearching ? "正在搜索…" : "没有找到" }
+        guard let result = model.searchResult else { return L("正在搜索…") }
+        if result.total == 0 { return model.isSearching ? L("正在搜索…") : L("没有找到") }
         if result.total > result.matches.count {
-            return "找到 \(result.total.formatted()) 项，列出最大的 \(result.matches.count) 项"
+            return L("找到 \(result.total.formatted()) 项，列出最大的 \(result.matches.count) 项")
         }
-        return "找到 \(result.total.formatted()) 项"
+        return L("找到 \(result.total.formatted()) 项")
     }
 }

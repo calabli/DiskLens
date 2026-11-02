@@ -17,9 +17,9 @@ struct TimelineView: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .day: "24 小时"
-            case .week: "7 天"
-            case .month: "30 天"
+            case .day: L("24 小时")
+            case .week: L("7 天")
+            case .month: L("30 天")
             }
         }
         var span: Int64 {
@@ -43,7 +43,7 @@ struct TimelineView: View {
                 ? .dateTime.month().day().hour() : .dateTime.month().day().weekday()
             return (start, start + range.bucket, Date(timeIntervalSince1970: TimeInterval(start)).formatted(format))
         }
-        return (end - range.span, end, "最近 \(range.title)")
+        return (end - range.span, end, L("最近 \(range.title)"))
     }
 
     var body: some View {
@@ -121,13 +121,13 @@ struct TimelineView: View {
         switch recording.status {
         case .enabled:
             if let last = data.lastRecord {
-                return "正在后台记录 · 最近一次 \(last.formatted(.relative(presentation: .named)))"
+                return L("正在后台记录 · 最近一次 \(last.formatted(.relative(presentation: .named)))")
             }
-            return "正在后台记录"
+            return L("正在后台记录")
         case .requiresApproval:
-            return "等待在系统设置中允许"
+            return L("等待在系统设置中允许")
         default:
-            return data.lastRecord == nil ? "后台记录未开启" : "后台记录已关闭，下面是之前的记录"
+            return data.lastRecord == nil ? L("后台记录未开启") : L("后台记录已关闭，下面是之前的记录")
         }
     }
 

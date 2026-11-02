@@ -91,9 +91,9 @@ public enum FolderOwner {
     /// For a folder inside `home`: the app or place it belongs to, e.g.
     /// "com.tencent.xinWeChat", "Google", "Xcode", "下载" or "~/Movies".
     public static func owner(of path: String, home: String) -> String {
-        guard path.hasPrefix(home + "/") else { return path == home ? "主目录" : "其他位置" }
+        guard path.hasPrefix(home + "/") else { return path == home ? L("主目录") : L("其他位置") }
         let parts = path.dropFirst(home.count + 1).split(separator: "/").map(String.init)
-        guard let first = parts.first else { return "主目录" }
+        guard let first = parts.first else { return L("主目录") }
 
         if first == "Library", parts.count >= 2 {
             let area = parts[1]
@@ -113,23 +113,23 @@ public enum FolderOwner {
             case "Mail", "Messages", "Photos", "Safari":
                 return area
             case "Mobile Documents", "CloudStorage":
-                return "iCloud 云盘"
+                return L("iCloud 云盘")
             default:
                 break
             }
-            return "资源库/" + area
+            return L("资源库/") + area
         }
         // Dependency folders in projects, wherever they are. Generic names such as
         // "build" or "target" are not enough on their own.
-        if parts.contains(where: { dependencyNames.contains($0) }) { return "开发项目依赖" }
+        if parts.contains(where: { dependencyNames.contains($0) }) { return L("开发项目依赖") }
         switch first {
-        case "Downloads": return "下载"
-        case "Desktop": return "桌面"
-        case "Documents": return "文稿"
-        case "Movies": return "影片"
-        case "Pictures": return "图片"
-        case "Music": return "音乐"
-        case ".Trash": return "废纸篓"
+        case "Downloads": return L("下载")
+        case "Desktop": return L("桌面")
+        case "Documents": return L("文稿")
+        case "Movies": return L("影片")
+        case "Pictures": return L("图片")
+        case "Music": return L("音乐")
+        case ".Trash": return L("废纸篓")
         default: return "~/" + first
         }
     }

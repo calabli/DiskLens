@@ -55,7 +55,7 @@ final class DevToolsModel {
                 do {
                     let result = try command.run(timeout: 15 * 60)
                     let text = [result.output, result.errors].filter { !$0.isEmpty }.joined(separator: "\n")
-                    return (result.succeeded, text.isEmpty ? (result.succeeded ? "完成。" : "命令失败，没有输出。") : text)
+                    return (result.succeeded, text.isEmpty ? (result.succeeded ? L("完成。") : L("命令失败，没有输出。")) : text)
                 } catch {
                     return (false, String(describing: error))
                 }

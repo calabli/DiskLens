@@ -349,7 +349,7 @@ private struct TreemapBlocks: View, @MainActor Equatable {
                                style: StrokeStyle(lineWidth: 0.75, dash: [3, 2]))
                     if rect.width >= 56 && rect.height >= 18 {
                         let lines = CGRect(x: rect.minX + 4, y: rect.minY + 2, width: rect.width - 8, height: rect.height - 4)
-                        drawLabel(&ctx, name: "其他 \(item.otherCount) 项", size: rect.height >= 32 ? item.otherSize : nil,
+                        drawLabel(&ctx, name: L("其他 \(item.otherCount) 项"), size: rect.height >= 32 ? item.otherSize : nil,
                                   in: lines, color: .secondary, weight: .medium)
                     }
                     continue
@@ -540,7 +540,7 @@ struct NodeTooltip: View {
     private func detail(_ node: Int) -> String {
         var parts = [ByteFormat.string(tree.totalSizes[node])]
         if tree.kinds[node] == .directory && !category.isOpaqueBundle {
-            parts.append("\(tree.fileCounts[node].formatted()) 个文件")
+            parts.append(L("\(tree.fileCounts[node].formatted()) 个文件"))
         } else {
             parts.append(category.label)
         }

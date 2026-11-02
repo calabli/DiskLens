@@ -35,7 +35,7 @@ struct DevToolsView: View {
                 }
                 let missing = DevEcosystem.allCases.filter { tools.groups[$0]?.items.isEmpty == true }
                 if !missing.isEmpty {
-                    Text("没有检测到：" + missing.map(\.title).joined(separator: "、"))
+                    Text(L("没有检测到：") + missing.map(\.title).joined(separator: L("、")))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -136,7 +136,7 @@ private struct DevItemRow: View {
                 Text(lastUsed, format: .relative(presentation: .named))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .help("最后使用：" + lastUsed.formatted(date: .long, time: .shortened))
+                    .help(L("最后使用：") + lastUsed.formatted(date: .long, time: .shortened))
             }
             Text(item.size.map(ByteFormat.string) ?? "—")
                 .monospacedDigit()
@@ -166,7 +166,7 @@ private struct DevItemRow: View {
     private var action: some View {
         switch item.removal {
         case .command:
-            Button(model.devTools.running == item.id ? "正在删除…" : "删除…", action: confirm)
+            Button(model.devTools.running == item.id ? L("正在删除…") : L("删除…"), action: confirm)
                 .disabled(model.devTools.running != nil)
         case let .trash(path):
             if model.isInBasket(path: path) {
@@ -176,7 +176,7 @@ private struct DevItemRow: View {
             } else {
                 Button("加入收集筐") { model.addToBasket(path: path, size: item.size ?? 0) }
                     .disabled(item.isActive)
-                    .help(item.isActive ? "正在使用，不能删除" : item.consequence)
+                    .help(item.isActive ? L("正在使用，不能删除") : item.consequence)
             }
         case let .none(reason):
             Image(systemName: "info.circle")
@@ -256,7 +256,7 @@ private struct RunCommandSheet: View {
                 }
             }
             if let result {
-                Label(result.succeeded ? "已完成，记在了清理记录里。" : "命令没有成功。",
+                Label(result.succeeded ? L("已完成，记在了清理记录里。") : L("命令没有成功。"),
                       systemImage: result.succeeded ? "checkmark.circle.fill" : "xmark.octagon.fill")
                     .foregroundStyle(result.succeeded ? .green : .red)
                 ScrollView {

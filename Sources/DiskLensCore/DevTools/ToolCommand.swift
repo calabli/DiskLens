@@ -42,8 +42,8 @@ public struct ToolCommand: Sendable, Hashable, Codable {
 
         public var description: String {
             switch self {
-            case let .notInstalled(program): "没有找到 \(program)"
-            case .timedOut: "命令运行超时"
+            case let .notInstalled(program): L("没有找到 \(program)")
+            case .timedOut: L("命令运行超时")
             }
         }
     }

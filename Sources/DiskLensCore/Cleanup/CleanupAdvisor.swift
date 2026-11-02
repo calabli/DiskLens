@@ -54,8 +54,8 @@ public struct CleanupAdvisor: Sendable {
             }
         }
         let suggestion = CleanupSuggestion(
-            id: rule.id, title: rule.title, category: rule.category, safety: rule.safety,
-            regenerable: rule.regenerable, explanation: rule.explanation, consequence: rule.consequence,
+            id: rule.id, title: rule.localized.title, category: rule.category, safety: rule.safety,
+            regenerable: rule.regenerable, explanation: rule.localized.explanation, consequence: rule.localized.consequence,
             action: rule.action ?? .trash, command: rule.command, apps: rule.apps ?? [],
             items: items.sorted { $0.size > $1.size })
         return suggestion.totalSize >= (rule.minimumSize ?? minimumSuggestionSize) ? suggestion : nil
@@ -134,10 +134,10 @@ public struct CleanupAdvisor: Sendable {
 
         let suggestion = CleanupSuggestion(
             id: "heuristic.inactive-projects",
-            title: "不活跃项目的依赖和构建产物",
+            title: L("不活跃项目的依赖和构建产物"),
             category: .projects, safety: .safe, regenerable: true,
-            explanation: "超过 \(Int(inactiveAfter / 86_400)) 天没有改动的项目里的 node_modules、target、Pods、.venv 等目录。",
-            consequence: "回到项目时重新执行 npm install、cargo build 等命令即可恢复。",
+            explanation: L("超过 \(Int(inactiveAfter / 86_400)) 天没有改动的项目里的 node_modules、target、Pods、.venv 等目录。"),
+            consequence: L("回到项目时重新执行 npm install、cargo build 等命令即可恢复。"),
             action: .trash, command: nil, apps: [],
             items: items.sorted { $0.size > $1.size })
         return suggestion.totalSize >= minimumSuggestionSize ? suggestion : nil
@@ -175,14 +175,14 @@ public struct CleanupAdvisor: Sendable {
     // MARK: Leftover app data
 
     private static let appDataLocations: [(path: String, label: String)] = [
-        ("Library/Application Support", "应用数据"),
-        ("Library/Caches", "缓存"),
-        ("Library/Containers", "沙盒容器"),
-        ("Library/Group Containers", "共享容器"),
-        ("Library/Saved Application State", "窗口状态"),
-        ("Library/HTTPStorages", "网络数据"),
-        ("Library/WebKit", "网页数据"),
-        ("Library/Logs", "日志"),
+        ("Library/Application Support", L("应用数据")),
+        ("Library/Caches", L("缓存")),
+        ("Library/Containers", L("沙盒容器")),
+        ("Library/Group Containers", L("共享容器")),
+        ("Library/Saved Application State", L("窗口状态")),
+        ("Library/HTTPStorages", L("网络数据")),
+        ("Library/WebKit", L("网页数据")),
+        ("Library/Logs", L("日志")),
     ]
 
     private func leftoverAppData(in tree: FileTree, claimed: Set<Int>) -> CleanupSuggestion? {
@@ -203,10 +203,10 @@ public struct CleanupAdvisor: Sendable {
         }
         let suggestion = CleanupSuggestion(
             id: "heuristic.leftover-apps",
-            title: "已卸载应用的残留数据",
+            title: L("已卸载应用的残留数据"),
             category: .leftovers, safety: .review, regenerable: false,
-            explanation: "资源库里的这些数据属于在“应用程序”文件夹中已经找不到的应用。",
-            consequence: "如果应用其实装在别处或以后还会重装，它的设置和数据将丢失。",
+            explanation: L("资源库里的这些数据属于在“应用程序”文件夹中已经找不到的应用。"),
+            consequence: L("如果应用其实装在别处或以后还会重装，它的设置和数据将丢失。"),
             action: .trash, command: nil, apps: [],
             items: items.sorted { $0.size > $1.size })
         return suggestion.totalSize >= minimumSuggestionSize ? suggestion : nil

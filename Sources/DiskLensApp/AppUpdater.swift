@@ -81,7 +81,7 @@ final class AppUpdater {
                     state = .upToDate
                 }
             } catch {
-                state = userInitiated ? .failed("没能连上 GitHub 检查更新，请稍后再试。") : .idle
+                state = userInitiated ? .failed(L("没能连上 GitHub 检查更新，请稍后再试。")) : .idle
             }
         }
     }
@@ -124,7 +124,7 @@ final class AppUpdater {
 
     private static func describe(_ error: Error) -> String {
         if let failure = error as? SoftwareUpdate.Failure { return failure.description }
-        if error is URLError { return "下载没能完成，请检查网络后再试。" }
+        if error is URLError { return L("下载没能完成，请检查网络后再试。") }
         return (error as NSError).localizedDescription
     }
 
@@ -138,7 +138,7 @@ final class AppUpdater {
             try fm.trashItem(at: current, resultingItemURL: &trashed)
         } catch {
             throw NSError(domain: "DiskLens", code: 1, userInfo: [NSLocalizedDescriptionKey:
-                "没能替换 \(current.deletingLastPathComponent().path) 里的 DiskLens（\(error.localizedDescription)）。可以从 GitHub 下载后手动替换。"])
+                L("没能替换 \(current.deletingLastPathComponent().path) 里的 DiskLens（\(error.localizedDescription)）。可以从 GitHub 下载后手动替换。")])
         }
         do {
             try fm.moveItem(at: newApp, to: current)
@@ -151,7 +151,7 @@ final class AppUpdater {
     }
 
     /// Opens `app` once this process has exited, and restarts the background agent from it.
-    private static func relaunch(_ app: URL) {
+    static func relaunch(_ app: URL) {
         let script = """
             while /bin/kill -0 "$1" 2>/dev/null; do /bin/sleep 0.2; done
             /usr/bin/open "$2"
@@ -168,5 +168,5 @@ final class AppUpdater {
     }
 
     /// For the About panel and Settings: "0.2.0（构建 63）".
-    static var versionLabel: String { build.isEmpty ? version : "\(version)（构建 \(build)）" }
+    static var versionLabel: String { build.isEmpty ? version : L("\(version)（构建 \(build)）") }
 }

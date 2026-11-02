@@ -36,11 +36,11 @@ struct LargeFilesView: View {
 
         var title: String {
             switch self {
-            case .any: "不限"
-            case .threeMonths: "3 个月以上"
-            case .sixMonths: "半年以上"
-            case .oneYear: "1 年以上"
-            case .twoYears: "2 年以上"
+            case .any: L("不限")
+            case .threeMonths: L("3 个月以上")
+            case .sixMonths: L("半年以上")
+            case .oneYear: L("1 年以上")
+            case .twoYears: L("2 年以上")
             }
         }
     }
@@ -173,7 +173,7 @@ struct LargeFilesView: View {
                 Text(row.lastUsedIsKnown ? row.lastUsed.formatted(date: .abbreviated, time: .omitted) : "—")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .help(row.lastUsedIsKnown ? "上次打开的时间" : "Spotlight 没有记录，筛选时按修改时间")
+                    .help(row.lastUsedIsKnown ? L("上次打开的时间") : L("Spotlight 没有记录，筛选时按修改时间"))
             }
             .width(min: 80, ideal: 100)
 
@@ -186,7 +186,7 @@ struct LargeFilesView: View {
         }
         .contextMenu(forSelectionType: Int.self) { nodes in
             if !nodes.isEmpty {
-                Button(nodes.count > 1 ? "将 \(nodes.count) 项加入收集筐" : "加入收集筐") {
+                Button(nodes.count > 1 ? L("将 \(nodes.count) 项加入收集筐") : L("加入收集筐")) {
                     nodes.forEach(model.addToBasket)
                 }
                 Divider()

@@ -43,7 +43,7 @@ struct VolumeInfo: Equatable {
         guard let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: keys),
               let total = values.volumeTotalCapacity, let available = values.volumeAvailableCapacity
         else { return nil }
-        name = values.volumeLocalizedName ?? "磁盘"
+        name = values.volumeLocalizedName ?? L("磁盘")
         self.total = Int64(total)
         self.available = Int64(available)
         availableForImportantUsage = values.volumeAvailableCapacityForImportantUsage ?? Int64(available)
@@ -271,7 +271,7 @@ final class AppModel {
             remember(updated, eventID: eventID, journalID: journalID)
             compare(base.tree, from: base.scannedAt, with: updated)
         case let .failure(error):
-            alertMessage = "没能更新扫描结果：\(error)"
+            alertMessage = L("没能更新扫描结果：\(error.localizedDescription)")
         }
     }
 
@@ -354,8 +354,8 @@ final class AppModel {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "扫描"
-        panel.message = "选择要分析的文件夹"
+        panel.prompt = L("扫描")
+        panel.message = L("选择要分析的文件夹")
         if panel.runModal() == .OK, let url = panel.url {
             scan(url.path)
         }
@@ -771,7 +771,7 @@ final class AppModel {
                 }
                 tree.remove(node)
             } catch {
-                failures.append("\(tree.names[node])：\(error.localizedDescription)")
+                failures.append(L("\(tree.names[node])：\(error.localizedDescription)"))
             }
         }
         basket = []
@@ -790,7 +790,7 @@ final class AppModel {
         if let path = lastScanPath { volume = VolumeInfo(path: path) }
 
         if !failures.isEmpty {
-            alertMessage = "有 \(failures.count) 项没能移到废纸篓：\n" + failures.prefix(5).joined(separator: "\n")
+            alertMessage = L("有 \(failures.count) 项没能移到废纸篓：\n") + failures.prefix(5).joined(separator: "\n")
         }
     }
 
@@ -817,8 +817,8 @@ final class AppModel {
                 self.logCleanup(logged + external)
                 let failed = items.filter { recycled[URL(fileURLWithPath: $0.path)] == nil }
                 if !failed.isEmpty {
-                    self.alertMessage = "有 \(failed.count) 项没能移到废纸篓"
-                        + (error.map { "：\($0.localizedDescription)" } ?? "")
+                    self.alertMessage = L("有 \(failed.count) 项没能移到废纸篓")
+                        + (error.map { L("：\($0.localizedDescription)") } ?? "")
                         + "\n" + failed.prefix(5).map(\.name).joined(separator: "\n")
                 }
                 self.externalItemsRecycled += 1
@@ -840,7 +840,7 @@ final class AppModel {
         do {
             try Self.cleanupLog.add(CleanupRecord(items: items))
         } catch {
-            alertMessage = "清理记录没能保存：\(error.localizedDescription)"
+            alertMessage = L("清理记录没能保存：\(error.localizedDescription)")
         }
         reloadCleanupRecords()
     }
@@ -856,14 +856,14 @@ final class AppModel {
             do {
                 try Self.cleanupLog.putBack(item, of: record.id)
             } catch {
-                failures.append("\(item.name)：\(error)")
+                failures.append(L("\(item.name)：\(error.localizedDescription)"))
             }
         }
         reloadCleanupRecords()
         if failures.count < items.count { rescan() }
         if let path = lastScanPath { volume = VolumeInfo(path: path) }
         if !failures.isEmpty {
-            alertMessage = "有 \(failures.count) 项没能放回：\n" + failures.prefix(5).joined(separator: "\n")
+            alertMessage = L("有 \(failures.count) 项没能放回：\n") + failures.prefix(5).joined(separator: "\n")
         }
     }
 }

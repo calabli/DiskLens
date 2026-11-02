@@ -67,7 +67,7 @@ struct FullDiskAccessGuide: View {
     @Environment(BackgroundRecording.self) private var recording
     @Environment(\.dismiss) private var dismiss
 
-    private let protected = ["邮件", "信息", "Safari", "其他应用的数据", "废纸篓", "通讯录与日历"]
+    private let protected = [L("邮件"), L("信息"), "Safari", L("其他应用的数据"), L("废纸篓"), L("通讯录与日历")]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -77,7 +77,7 @@ struct FullDiskAccessGuide: View {
                     .foregroundStyle(access.isGranted ? Color.green : Color.accentColor)
                     .contentTransition(.symbolEffect(.replace))
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(access.isGranted ? "DiskLens 已经能看到整块磁盘" : "让 DiskLens 看到整块磁盘")
+                    Text(access.isGranted ? L("DiskLens 已经能看到整块磁盘") : L("让 DiskLens 看到整块磁盘"))
                         .font(.title2.weight(.semibold))
                     Text("没有“完全磁盘访问权限”时，macOS 不允许任何应用读取这些位置，扫描出的结果会偏小：")
                         .foregroundStyle(.secondary)

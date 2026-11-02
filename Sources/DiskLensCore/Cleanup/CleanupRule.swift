@@ -54,6 +54,20 @@ public struct CleanupRule: Codable, Sendable, Identifiable {
     public let command: String?
     /// Smallest total worth mentioning, in bytes.
     public let minimumSize: Int64?
+    /// The English wording; the Chinese fields above are the source text.
+    public let en: Wording?
+
+    public struct Wording: Codable, Sendable {
+        public let title: String
+        public let explanation: String
+        public let consequence: String
+    }
+
+    /// The wording in the language the app runs in.
+    public var localized: Wording {
+        if AppLanguage.isEnglish, let en { return en }
+        return Wording(title: title, explanation: explanation, consequence: consequence)
+    }
 }
 
 public struct CleanupRuleSet: Codable, Sendable {

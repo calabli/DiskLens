@@ -16,8 +16,8 @@ enum AppleTools {
         items += runtimes.map { runtime($0, devices: devices) }
         items += deviceSupport(context)
         items += derivedData(context)
-        let note = items.isEmpty ? "没有找到 Xcode 或它的数据。"
-            : simulatorsUnavailable ? "模拟器服务（CoreSimulator）没有响应，这次没能列出模拟器；稍后点「重新检测」再试。" : nil
+        let note = items.isEmpty ? L("没有找到 Xcode 或它的数据。")
+            : simulatorsUnavailable ? L("模拟器服务（CoreSimulator）没有响应，这次没能列出模拟器；稍后点「重新检测」再试。") : nil
         return DevGroup(ecosystem: .apple, items: items, note: note)
     }
 
@@ -35,11 +35,11 @@ enum AppleTools {
             let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String
             let isSelected = selected.map { $0.hasPrefix(path + "/") } ?? false
             return DevItem(id: "xcode:" + path, ecosystem: .apple, kind: "Xcode",
-                           title: (path as NSString).lastPathComponent, detail: version.map { "版本 \($0)" },
+                           title: (path as NSString).lastPathComponent, detail: version.map { L("版本 \($0)") },
                            path: path, size: context.size(of: path), lastUsed: lastOpened(path),
-                           usage: isSelected ? .active("当前使用（xcode-select）") : .unknown,
+                           usage: isSelected ? .active(L("当前使用（xcode-select）")) : .unknown,
                            removal: .trash(path),
-                           consequence: "这个版本的 Xcode 会被移到废纸篓；用它编译的项目需要改用其他版本。")
+                           consequence: L("这个版本的 Xcode 会被移到废纸篓；用它编译的项目需要改用其他版本。"))
         }
     }
 
@@ -87,17 +87,17 @@ enum AppleTools {
 
     private static func simulator(_ device: Device, _ context: DevContext) -> DevItem {
         let usage: DevItem.Usage = if device.state == "Booted" {
-            .active("正在运行")
+            .active(L("正在运行"))
         } else if !device.isAvailable {
-            .unused("系统版本已删除，不能再启动")
+            .unused(L("系统版本已删除，不能再启动"))
         } else {
             .unknown
         }
-        return DevItem(id: "simulator:" + device.udid, ecosystem: .apple, kind: "模拟器",
+        return DevItem(id: "simulator:" + device.udid, ecosystem: .apple, kind: L("模拟器"),
                        title: device.name, detail: runtimeName(device.runtime), path: device.dataPath,
                        size: device.dataSize ?? device.dataPath.flatMap(context.size(of:)), lastUsed: device.lastBooted,
                        usage: usage, removal: .command(ToolCommand("xcrun", ["simctl", "delete", device.udid])),
-                       consequence: "这台模拟器和装在里面的应用、数据会被删除；需要时可以在 Xcode 里重新创建。")
+                       consequence: L("这台模拟器和装在里面的应用、数据会被删除；需要时可以在 Xcode 里重新创建。"))
     }
 
     struct Runtime: Equatable {
@@ -130,14 +130,14 @@ enum AppleTools {
     private static func runtime(_ runtime: Runtime, devices: [Device]) -> DevItem {
         let users = devices.filter { $0.runtime == runtime.runtimeIdentifier }.count
         let name = runtimeName(runtime.runtimeIdentifier)
-        return DevItem(id: "runtime:" + runtime.identifier, ecosystem: .apple, kind: "模拟器系统",
-                       title: name, detail: runtime.build.isEmpty ? nil : "构建 \(runtime.build)", path: runtime.path,
+        return DevItem(id: "runtime:" + runtime.identifier, ecosystem: .apple, kind: L("模拟器系统"),
+                       title: name, detail: runtime.build.isEmpty ? nil : L("构建 \(runtime.build)"), path: runtime.path,
                        size: runtime.size, lastUsed: runtime.lastUsed,
-                       usage: users > 0 ? .used("\(users) 台模拟器在用") : .unused("没有模拟器在用"),
+                       usage: users > 0 ? .used(L("\(users) 台模拟器在用")) : .unused(L("没有模拟器在用")),
                        removal: runtime.deletable
                            ? .command(ToolCommand("xcrun", ["simctl", "runtime", "delete", runtime.identifier]))
-                           : .none("随 Xcode 一起安装，不能单独删除"),
-                       consequence: "用这个系统版本的模拟器将无法启动；需要时可以在 Xcode 的设置里重新下载。")
+                           : .none(L("随 Xcode 一起安装，不能单独删除")),
+                       consequence: L("用这个系统版本的模拟器将无法启动；需要时可以在 Xcode 的设置里重新下载。"))
     }
 
     // MARK: Device support and DerivedData
@@ -153,12 +153,12 @@ enum AppleTools {
             })
             return folders.map { path in
                 let name = (path as NSString).lastPathComponent
-                let usage: DevItem.Usage = newest.contains(name) ? .used("这台设备最新的一份") : .unused("这台设备已有更新的系统版本")
-                return DevItem(id: "devicesupport:" + path, ecosystem: .apple, kind: "设备调试符号",
+                let usage: DevItem.Usage = newest.contains(name) ? .used(L("这台设备最新的一份")) : .unused(L("这台设备已有更新的系统版本"))
+                return DevItem(id: "devicesupport:" + path, ecosystem: .apple, kind: L("设备调试符号"),
                                title: name, detail: platform.replacingOccurrences(of: " DeviceSupport", with: ""),
                                path: path, size: context.size(of: path), lastUsed: context.modified(path), usage: usage,
                                removal: .trash(path),
-                               consequence: "再连接这个系统版本的设备调试时，Xcode 会重新下载，需要几分钟。")
+                               consequence: L("再连接这个系统版本的设备调试时，Xcode 会重新下载，需要几分钟。"))
             }
         }
     }
@@ -187,17 +187,17 @@ enum AppleTools {
             let workspace = info?["WorkspacePath"] as? String
             let accessed = info?["LastAccessedDate"] as? Date ?? context.modified(path)
             let usage: DevItem.Usage = workspace.map {
-                FileManager.default.fileExists(atPath: $0) ? .used("项目还在") : .unused("项目已不存在")
+                FileManager.default.fileExists(atPath: $0) ? .used(L("项目还在")) : .unused(L("项目已不存在"))
             } ?? .unknown
             let folder = (path as NSString).lastPathComponent
             // "Balance-dcpdfurxzfyvaleftwwznpamjqlg" → "Balance"; shared caches such as "SymbolCache.noindex" keep their name.
             let project = folder.range(of: #"-[a-z]{28}$"#, options: .regularExpression).map { String(folder[..<$0.lowerBound]) }
             let name = workspace.map { ($0 as NSString).lastPathComponent } ?? project ?? folder
-            return DevItem(id: "derived:" + path, ecosystem: .apple, kind: workspace == nil && project == nil ? "Xcode 共享缓存" : "编译缓存", title: name,
+            return DevItem(id: "derived:" + path, ecosystem: .apple, kind: workspace == nil && project == nil ? L("Xcode 共享缓存") : L("编译缓存"), title: name,
                            detail: workspace.map { ($0 as NSString).deletingLastPathComponent.abbreviatingHome },
                            path: path, size: context.size(of: path), lastUsed: accessed, usage: usage,
                            removal: .trash(path),
-                           consequence: "下次打开这个项目时会重新编译和建立索引，第一次会慢一些。")
+                           consequence: L("下次打开这个项目时会重新编译和建立索引，第一次会慢一些。"))
         }
     }
 }

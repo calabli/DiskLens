@@ -11,10 +11,10 @@ enum JavaTools {
             // ".../zulu-8.jdk/Contents/Home" → the .jdk bundle.
             let bundle = jdk.home.components(separatedBy: "/Contents/Home").first ?? jdk.home
             items.append(DevItem(id: "jdk:" + bundle, ecosystem: .java, kind: "JDK", title: jdk.name,
-                                 detail: "版本 \(jdk.version) · \(jdk.vendor)", path: bundle, size: context.size(of: bundle),
-                                 usage: jdk.home == current ? .active("当前默认") : .unknown,
+                                 detail: L("版本 \(jdk.version) · \(jdk.vendor)"), path: bundle, size: context.size(of: bundle),
+                                 usage: jdk.home == current ? .active(L("当前默认")) : .unknown,
                                  removal: .trash(bundle),
-                                 consequence: "这个 JDK 会被移到废纸篓；指定用它的项目和工具需要改用其他版本。"))
+                                 consequence: L("这个 JDK 会被移到废纸篓；指定用它的项目和工具需要改用其他版本。")))
         }
 
         let wanted = gradleVersionsInProjects(context)
@@ -25,20 +25,20 @@ enum JavaTools {
             let projects = wanted[version] ?? 0
             items.append(DevItem(id: "gradle:" + path, ecosystem: .java, kind: "Gradle", title: "Gradle \(version)",
                                  detail: folder, path: path, size: context.size(of: path), lastUsed: context.modified(path),
-                                 usage: projects > 0 ? .used("\(projects) 个项目在用") : (context.tree == nil ? .unknown : .unused("扫描范围内没有项目在用")),
+                                 usage: projects > 0 ? .used(L("\(projects) 个项目在用")) : (context.tree == nil ? .unknown : .unused(L("扫描范围内没有项目在用"))),
                                  removal: .trash(path),
-                                 consequence: "用这个版本的项目下次构建时会重新下载它，约 100–200 MB。"))
+                                 consequence: L("用这个版本的项目下次构建时会重新下载它，约 100–200 MB。")))
         }
         for (path, title, consequence) in [
-            (context.home + "/.gradle/caches", "Gradle 缓存", "依赖和构建缓存会在下次构建时重新下载，第一次会慢很多。"),
-            (context.home + "/.m2/repository", "Maven 本地仓库", "依赖会在下次构建时重新下载。"),
+            (context.home + "/.gradle/caches", L("Gradle 缓存"), L("依赖和构建缓存会在下次构建时重新下载，第一次会慢很多。")),
+            (context.home + "/.m2/repository", L("Maven 本地仓库"), L("依赖会在下次构建时重新下载。")),
         ] {
             guard let size = context.size(of: path), size > 0 else { continue }
-            items.append(DevItem(id: "java:" + path, ecosystem: .java, kind: "缓存", title: title, detail: path.abbreviatingHome,
-                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable("可以重新下载"),
+            items.append(DevItem(id: "java:" + path, ecosystem: .java, kind: L("缓存"), title: title, detail: path.abbreviatingHome,
+                                 path: path, size: size, lastUsed: context.modified(path), usage: .regenerable(L("可以重新下载")),
                                  removal: .trash(path), consequence: consequence))
         }
-        return DevGroup(ecosystem: .java, items: items, note: items.isEmpty ? "没有找到 JDK、Gradle 或 Maven 的数据。" : nil)
+        return DevGroup(ecosystem: .java, items: items, note: items.isEmpty ? L("没有找到 JDK、Gradle 或 Maven 的数据。") : nil)
     }
 
     struct JavaHome: Equatable {
@@ -96,18 +96,18 @@ enum GoTools {
             .nonEmpty ?? context.home + "/Library/Caches/go-build"
         var items: [DevItem] = []
         if let size = context.size(of: modCache), size > 0 {
-            items.append(DevItem(id: "go:mod", ecosystem: .go, kind: "模块缓存", title: "模块缓存", detail: modCache.abbreviatingHome,
-                                 path: modCache, size: size, lastUsed: context.modified(modCache), usage: .regenerable("可以重新下载"),
+            items.append(DevItem(id: "go:mod", ecosystem: .go, kind: L("模块缓存"), title: L("模块缓存"), detail: modCache.abbreviatingHome,
+                                 path: modCache, size: size, lastUsed: context.modified(modCache), usage: .regenerable(L("可以重新下载")),
                                  removal: hasGo ? .command(ToolCommand("go", ["clean", "-modcache"])) : .trash(modCache),
-                                 consequence: "下载过的依赖模块和自动下载的 Go 工具链都会删除，下次构建时重新下载。"))
+                                 consequence: L("下载过的依赖模块和自动下载的 Go 工具链都会删除，下次构建时重新下载。")))
         }
         if let size = context.size(of: buildCache), size > 0 {
-            items.append(DevItem(id: "go:build", ecosystem: .go, kind: "构建缓存", title: "构建缓存", detail: buildCache.abbreviatingHome,
-                                 path: buildCache, size: size, lastUsed: context.modified(buildCache), usage: .regenerable("可以重新生成"),
+            items.append(DevItem(id: "go:build", ecosystem: .go, kind: L("构建缓存"), title: L("构建缓存"), detail: buildCache.abbreviatingHome,
+                                 path: buildCache, size: size, lastUsed: context.modified(buildCache), usage: .regenerable(L("可以重新生成")),
                                  removal: hasGo ? .command(ToolCommand("go", ["clean", "-cache"])) : .trash(buildCache),
-                                 consequence: "下次编译会重新生成，第一次会慢一些。"))
+                                 consequence: L("下次编译会重新生成，第一次会慢一些。")))
         }
-        return DevGroup(ecosystem: .go, items: items, note: items.isEmpty ? "没有找到 Go 的数据。" : nil)
+        return DevGroup(ecosystem: .go, items: items, note: items.isEmpty ? L("没有找到 Go 的数据。") : nil)
     }
 }
 

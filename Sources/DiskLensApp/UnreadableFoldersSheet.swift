@@ -6,8 +6,8 @@ extension UnreadableFolder {
     /// Why the folder could not be read, in a few words.
     var reason: String {
         switch code {
-        case EPERM: "受 macOS 隐私保护"
-        case EACCES: "没有读取权限"
+        case EPERM: L("受 macOS 隐私保护")
+        case EACCES: L("没有读取权限")
         default: String(cString: strerror(code))
         }
     }
@@ -29,17 +29,17 @@ struct UnreadableFoldersSheet: View {
 
         var title: String {
             switch self {
-            case .privacy: "受 macOS 隐私保护"
-            case .permissions: "属于系统或其他用户"
-            case .other: "其他原因"
+            case .privacy: L("受 macOS 隐私保护")
+            case .permissions: L("属于系统或其他用户")
+            case .other: L("其他原因")
             }
         }
 
         var detail: String {
             switch self {
-            case .privacy: "开启完全磁盘访问权限后就能读取。"
-            case .permissions: "只有它们的主人或管理员能打开，DiskLens 不会绕过这些权限。"
-            case .other: "读取时出了错，可能是文件夹正在变动或磁盘有问题。"
+            case .privacy: L("开启完全磁盘访问权限后就能读取。")
+            case .permissions: L("只有它们的主人或管理员能打开，DiskLens 不会绕过这些权限。")
+            case .other: L("读取时出了错，可能是文件夹正在变动或磁盘有问题。")
             }
         }
     }
@@ -77,7 +77,7 @@ struct UnreadableFoldersSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(group.title)（\(folders.count)）")
                                 Text(group == .privacy && access.isGranted && model.scannedWithFullDiskAccess
-                                     ? "已经开启了完全磁盘访问权限，macOS 仍不允许读取这些位置。"
+                                     ? L("已经开启了完全磁盘访问权限，macOS 仍不允许读取这些位置。")
                                      : group.detail)
                                     .font(.caption).foregroundStyle(.secondary).textCase(nil)
                             }

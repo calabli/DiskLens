@@ -6,17 +6,17 @@ enum DockerTools {
         var items: [DevItem] = []
         let raw = context.home + "/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
         if let size = context.size(of: raw) {
-            items.append(DevItem(id: "docker:raw", ecosystem: .docker, kind: "磁盘映像", title: "Docker.raw",
-                                 detail: "Docker 的虚拟磁盘，镜像和容器都存在里面", path: raw, size: size,
-                                 lastUsed: context.modified(raw), usage: .active("Docker 的全部数据"),
-                                 removal: .none("删除镜像后它不会自动变小；可以在 Docker 设置里调整磁盘上限"),
+            items.append(DevItem(id: "docker:raw", ecosystem: .docker, kind: L("磁盘映像"), title: "Docker.raw",
+                                 detail: L("Docker 的虚拟磁盘，镜像和容器都存在里面"), path: raw, size: size,
+                                 lastUsed: context.modified(raw), usage: .active(L("Docker 的全部数据")),
+                                 removal: .none(L("删除镜像后它不会自动变小；可以在 Docker 设置里调整磁盘上限")),
                                  consequence: ""))
         }
         guard ToolCommand("docker", []).isInstalled else {
-            return DevGroup(ecosystem: .docker, items: items, note: items.isEmpty ? "没有安装 Docker。" : nil)
+            return DevGroup(ecosystem: .docker, items: items, note: items.isEmpty ? L("没有安装 Docker。") : nil)
         }
         guard context.output("docker", ["info", "--format", "{{.ServerVersion}}"], timeout: 10) != nil else {
-            return DevGroup(ecosystem: .docker, items: items, note: "Docker 没在运行。启动 Docker 后，可以按镜像查看和清理。")
+            return DevGroup(ecosystem: .docker, items: items, note: L("Docker 没在运行。启动 Docker 后，可以按镜像查看和清理。"))
         }
 
         let inUse = Set((context.output("docker", ["ps", "-a", "--format", "{{.Image}}"]) ?? "")
@@ -24,31 +24,31 @@ enum DockerTools {
         let images = parseImages(context.output("docker", ["images", "--format", "{{json .}}"]) ?? "")
         for image in images {
             let used = inUse.contains(image.reference) || inUse.contains(image.id) || inUse.contains { $0.hasPrefix(image.id) }
-            items.append(DevItem(id: "docker:image:" + image.id, ecosystem: .docker, kind: "镜像",
+            items.append(DevItem(id: "docker:image:" + image.id, ecosystem: .docker, kind: L("镜像"),
                                  title: image.reference, detail: image.created, size: image.size,
-                                 usage: used ? .active("有容器在用") : (image.isDangling ? .unused("没有名字的旧镜像") : .unknown),
+                                 usage: used ? .active(L("有容器在用")) : (image.isDangling ? .unused(L("没有名字的旧镜像")) : .unknown),
                                  removal: .command(ToolCommand("docker", ["image", "rm", image.id])),
-                                 consequence: "这个镜像会被删除，再用到时需要重新拉取或构建。"))
+                                 consequence: L("这个镜像会被删除，再用到时需要重新拉取或构建。")))
         }
         for row in parseSystemDF(context.output("docker", ["system", "df", "--format", "{{json .}}"]) ?? "") {
             switch row.type {
             case "Containers" where row.reclaimable > 0:
-                items.append(DevItem(id: "docker:containers", ecosystem: .docker, kind: "容器", title: "已停止的容器",
-                                     detail: "共 \(row.count) 个容器", size: row.reclaimable,
-                                     usage: .unused("已经停止"),
+                items.append(DevItem(id: "docker:containers", ecosystem: .docker, kind: L("容器"), title: L("已停止的容器"),
+                                     detail: L("共 \(row.count) 个容器"), size: row.reclaimable,
+                                     usage: .unused(L("已经停止")),
                                      removal: .command(ToolCommand("docker", ["container", "prune", "-f"])),
-                                     consequence: "所有已停止的容器会被删除，容器里没有存到数据卷的改动会丢失。"))
+                                     consequence: L("所有已停止的容器会被删除，容器里没有存到数据卷的改动会丢失。")))
             case "Build Cache" where row.reclaimable > 0:
-                items.append(DevItem(id: "docker:buildcache", ecosystem: .docker, kind: "构建缓存", title: "构建缓存",
-                                     size: row.reclaimable, usage: .regenerable("可以重新生成"),
+                items.append(DevItem(id: "docker:buildcache", ecosystem: .docker, kind: L("构建缓存"), title: L("构建缓存"),
+                                     size: row.reclaimable, usage: .regenerable(L("可以重新生成")),
                                      removal: .command(ToolCommand("docker", ["builder", "prune", "-f"])),
-                                     consequence: "下次构建镜像时会从头构建，第一次会慢一些。"))
+                                     consequence: L("下次构建镜像时会从头构建，第一次会慢一些。")))
             default:
                 break
             }
         }
         return DevGroup(ecosystem: .docker, items: items,
-                        note: "删除镜像和容器后，Docker.raw 不会自动变小，空出的空间留给 Docker 以后使用。")
+                        note: L("删除镜像和容器后，Docker.raw 不会自动变小，空出的空间留给 Docker 以后使用。"))
     }
 
     struct Image: Equatable {

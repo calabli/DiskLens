@@ -148,16 +148,16 @@ extension FileCategory {
 
     var label: String {
         switch self {
-        case .folder: "文件夹"
-        case .application: "应用"
-        case .video: "视频"
-        case .image: "图片"
-        case .audio: "音频"
-        case .document: "文档"
-        case .code: "代码与数据"
-        case .archive: "压缩包"
-        case .diskImage: "磁盘映像与安装包"
-        case .other: "其他"
+        case .folder: L("文件夹")
+        case .application: L("应用")
+        case .video: L("视频")
+        case .image: L("图片")
+        case .audio: L("音频")
+        case .document: L("文档")
+        case .code: L("代码与数据")
+        case .archive: L("压缩包")
+        case .diskImage: L("磁盘映像与安装包")
+        case .other: L("其他")
         }
     }
 

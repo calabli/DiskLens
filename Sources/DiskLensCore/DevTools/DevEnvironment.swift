@@ -6,10 +6,10 @@ public enum DevEcosystem: String, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .apple: "Xcode 与模拟器"
+        case .apple: L("Xcode 与模拟器")
         case .android: "Android"
         case .docker: "Docker"
-        case .ai: "AI 模型"
+        case .ai: L("AI 模型")
         case .homebrew: "Homebrew"
         case .node: "Node.js"
         case .python: "Python"
@@ -156,10 +156,10 @@ public struct DevContext: Sendable {
 
     /// How a version is used: the default one, asked for by projects, or neither.
     func usage(of version: String, isDefault: Bool, wanted: [String]) -> DevItem.Usage {
-        if isDefault { return .active("当前默认") }
+        if isDefault { return .active(L("当前默认")) }
         let projects = wanted.filter { DevContext.version($0, matches: version) }.count
-        if projects > 0 { return .used("\(projects) 个项目在用") }
-        return tree == nil ? .unknown : .unused("扫描范围内没有项目在用")
+        if projects > 0 { return .used(L("\(projects) 个项目在用")) }
+        return tree == nil ? .unknown : .unused(L("扫描范围内没有项目在用"))
     }
 
     /// Whether `wanted` (as a project file writes it: "18", "v20.11", "3.11", "ruby-3.2.2")

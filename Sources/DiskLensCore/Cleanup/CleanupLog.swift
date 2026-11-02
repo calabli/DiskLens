@@ -105,8 +105,8 @@ public struct CleanupLog: Sendable {
 
         public var description: String {
             switch self {
-            case .notInTrash: "已经不在废纸篓里了"
-            case .occupied: "原来的位置已经有同名的项目"
+            case .notInTrash: L("已经不在废纸篓里了")
+            case .occupied: L("原来的位置已经有同名的项目")
             case let .failed(reason): reason
             }
         }

@@ -12,11 +12,11 @@ enum AndroidTools {
         for avd in avds {
             let avdmanager = sdk.map { $0 + "/cmdline-tools/latest/bin/avdmanager" }
                 .flatMap { FileManager.default.isExecutableFile(atPath: $0) ? $0 : nil }
-            items.append(DevItem(id: "avd:" + avd.path, ecosystem: .android, kind: "模拟器", title: avd.name,
+            items.append(DevItem(id: "avd:" + avd.path, ecosystem: .android, kind: L("模拟器"), title: avd.name,
                                  detail: avd.image.map { $0.replacingOccurrences(of: "system-images/", with: "") },
                                  path: avd.path, size: context.size(of: avd.path), lastUsed: context.modified(avd.path),
                                  removal: avdmanager.map { .command(ToolCommand($0, ["delete", "avd", "-n", avd.name])) } ?? .trash(avd.path),
-                                 consequence: "这台模拟器和里面的应用、数据会被删除；需要时可以在 Android Studio 里重新创建。"))
+                                 consequence: L("这台模拟器和里面的应用、数据会被删除；需要时可以在 Android Studio 里重新创建。")))
         }
         guard let sdk else {
             return DevGroup(ecosystem: .android, items: items)
@@ -27,12 +27,12 @@ enum AndroidTools {
                 for abi in context.subfolders(of: tag) {
                     let relative = String(abi.dropFirst(sdk.count + 1))
                     let users = usedImages.filter { $0.hasPrefix(relative) }.count
-                    items.append(DevItem(id: "sysimg:" + abi, ecosystem: .android, kind: "系统映像",
+                    items.append(DevItem(id: "sysimg:" + abi, ecosystem: .android, kind: L("系统映像"),
                                          title: relative.replacingOccurrences(of: "system-images/", with: ""),
                                          path: abi, size: context.size(of: abi), lastUsed: context.modified(abi),
-                                         usage: users > 0 ? .used("\(users) 台模拟器在用") : .unused("没有模拟器在用"),
+                                         usage: users > 0 ? .used(L("\(users) 台模拟器在用")) : .unused(L("没有模拟器在用")),
                                          removal: .trash(abi),
-                                         consequence: "用这个系统映像的模拟器将无法启动；需要时可以在 SDK Manager 里重新下载。"))
+                                         consequence: L("用这个系统映像的模拟器将无法启动；需要时可以在 SDK Manager 里重新下载。")))
                 }
             }
         }
@@ -41,17 +41,17 @@ enum AndroidTools {
         let newest = buildTools.map { ($0 as NSString).lastPathComponent }.max { SoftwareUpdate.isNewer($1, than: $0) }
         for path in buildTools {
             let version = (path as NSString).lastPathComponent
-            items.append(DevItem(id: "buildtools:" + path, ecosystem: .android, kind: "构建工具", title: "Build Tools \(version)",
+            items.append(DevItem(id: "buildtools:" + path, ecosystem: .android, kind: L("构建工具"), title: "Build Tools \(version)",
                                  path: path, size: context.size(of: path), lastUsed: context.modified(path),
-                                 usage: version == newest ? .used("最新版本") : .unknown,
+                                 usage: version == newest ? .used(L("最新版本")) : .unknown,
                                  removal: .trash(path),
-                                 consequence: "指定这个版本的项目构建时会重新下载它。"))
+                                 consequence: L("指定这个版本的项目构建时会重新下载它。")))
         }
         for path in context.subfolders(of: sdk + "/platforms") {
-            items.append(DevItem(id: "platform:" + path, ecosystem: .android, kind: "SDK 平台",
+            items.append(DevItem(id: "platform:" + path, ecosystem: .android, kind: L("SDK 平台"),
                                  title: (path as NSString).lastPathComponent, path: path, size: context.size(of: path),
                                  lastUsed: context.modified(path), removal: .trash(path),
-                                 consequence: "以这个 API 版本编译的项目构建时会重新下载它。"))
+                                 consequence: L("以这个 API 版本编译的项目构建时会重新下载它。")))
         }
         return DevGroup(ecosystem: .android, items: items)
     }
@@ -91,20 +91,20 @@ enum ModelTools {
         for path in context.subfolders(of: hub) {
             let folder = (path as NSString).lastPathComponent
             guard let (kind, name) = huggingFaceName(folder) else { continue }
-            items.append(DevItem(id: "hf:" + path, ecosystem: .ai, kind: kind, title: name, detail: "Hugging Face 缓存",
+            items.append(DevItem(id: "hf:" + path, ecosystem: .ai, kind: kind, title: name, detail: L("Hugging Face 缓存"),
                                  path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                  removal: .trash(path),
-                                 consequence: "下次用到这个模型时会重新下载，大模型可能要很久。"))
+                                 consequence: L("下次用到这个模型时会重新下载，大模型可能要很久。")))
         }
 
         for base in [context.home + "/.lmstudio/models", context.home + "/.cache/lm-studio/models"] {
             for publisher in context.subfolders(of: base) {
                 for path in context.subfolders(of: publisher) {
                     let name = (publisher as NSString).lastPathComponent + "/" + (path as NSString).lastPathComponent
-                    items.append(DevItem(id: "lmstudio:" + path, ecosystem: .ai, kind: "模型", title: name, detail: "LM Studio",
+                    items.append(DevItem(id: "lmstudio:" + path, ecosystem: .ai, kind: L("模型"), title: name, detail: "LM Studio",
                                          path: path, size: context.size(of: path), lastUsed: context.modified(path),
                                          removal: .trash(path),
-                                         consequence: "这个模型会被移到废纸篓；需要时在 LM Studio 里重新下载。"))
+                                         consequence: L("这个模型会被移到废纸篓；需要时在 LM Studio 里重新下载。")))
                 }
             }
         }
@@ -116,8 +116,8 @@ enum ModelTools {
         let parts = folder.components(separatedBy: "--")
         guard parts.count >= 2 else { return nil }
         let kind = switch parts[0] {
-        case "models": "模型"
-        case "datasets": "数据集"
+        case "models": L("模型")
+        case "datasets": L("数据集")
         case "spaces": "Space"
         default: ""
         }
@@ -149,11 +149,11 @@ enum ModelTools {
         let hasOllama = ToolCommand("ollama", []).isInstalled
         return models.map { model, path in
             let shared = model.layers.filter { (useCount[$0] ?? 0) > 1 }.count
-            return DevItem(id: "ollama:" + path, ecosystem: .ai, kind: "模型", title: model.name,
-                           detail: "Ollama" + (shared > 0 ? " · 部分数据与其他模型共用" : ""), path: path,
+            return DevItem(id: "ollama:" + path, ecosystem: .ai, kind: L("模型"), title: model.name,
+                           detail: "Ollama" + (shared > 0 ? L(" · 部分数据与其他模型共用") : ""), path: path,
                            size: model.size, lastUsed: context.modified(path),
-                           removal: hasOllama ? .command(ToolCommand("ollama", ["rm", model.name])) : .none("用 ollama rm 删除"),
-                           consequence: "这个模型会被删除；需要时用 ollama pull 重新下载。")
+                           removal: hasOllama ? .command(ToolCommand("ollama", ["rm", model.name])) : .none(L("用 ollama rm 删除")),
+                           consequence: L("这个模型会被删除；需要时用 ollama pull 重新下载。"))
         }
     }
 

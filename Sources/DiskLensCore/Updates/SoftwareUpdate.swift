@@ -106,9 +106,9 @@ public enum SoftwareUpdate {
 
         public var description: String {
             switch self {
-            case .badSignature: "下载的安装包签名不对，可能被改动过，已经丢弃"
-            case let .notAnUpdate(reason): "下载的不是可用的 DiskLens：\(reason)"
-            case .unpackFailed: "安装包没能解压"
+            case .badSignature: L("下载的安装包签名不对，可能被改动过，已经丢弃")
+            case let .notAnUpdate(reason): L("下载的不是可用的 DiskLens：\(reason)")
+            case .unpackFailed: L("安装包没能解压")
             }
         }
     }
@@ -136,10 +136,10 @@ public enum SoftwareUpdate {
         try? fm.removeItem(at: zip)
         guard unpack.succeeded else { throw Failure.unpackFailed }
         let app = folder.appendingPathComponent("DiskLens.app")
-        guard let bundle = Bundle(url: app) else { throw Failure.notAnUpdate("找不到 DiskLens.app") }
-        guard bundle.bundleIdentifier == "app.disklens.DiskLens" else { throw Failure.notAnUpdate("标识符不对") }
+        guard let bundle = Bundle(url: app) else { throw Failure.notAnUpdate(L("找不到 DiskLens.app")) }
+        guard bundle.bundleIdentifier == "app.disklens.DiskLens" else { throw Failure.notAnUpdate(L("标识符不对")) }
         let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        guard version == expectedVersion else { throw Failure.notAnUpdate("版本是 \(version)，应为 \(expectedVersion)") }
+        guard version == expectedVersion else { throw Failure.notAnUpdate(L("版本是 \(version)，应为 \(expectedVersion)")) }
         return app
     }
 

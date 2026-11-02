@@ -99,8 +99,8 @@ final class SpaceMonitor {
         if defaults.bool(forKey: Keys.lowSpaceAlerts), free < threshold,
            now.timeIntervalSince(lastLowSpaceAlert) > 6 * 3_600 {
             lastLowSpaceAlert = now
-            post(title: "磁盘空间不足",
-                 body: "“\(volume.name)”只剩 \(ByteFormat.string(free))。打开 DiskLens 看看哪些可以清理。")
+            post(title: L("磁盘空间不足"),
+                 body: L("“\(volume.name)”只剩 \(ByteFormat.string(free))。打开 DiskLens 看看哪些可以清理。"))
         }
 
         samples.append((now, volume.used))
@@ -112,9 +112,9 @@ final class SpaceMonitor {
             let start = Int64(oldest.date.timeIntervalSince1970)
             Task {
                 let top = await Task.detached { (try? ActivityStore())?.growthByOwner(from: start, to: Int64(now.timeIntervalSince1970) + 60, limit: 1).first }.value
-                let source = top.map { "，主要来自“\($0.app)”（\($0.bytes.signedBytes)）" } ?? ""
-                post(title: "磁盘占用增长很快",
-                     body: "过去一小时内多用了 \(ByteFormat.string(grown))\(source)。")
+                let source = top.map { L("，主要来自“\($0.app)”（\($0.bytes.signedBytes)）") } ?? ""
+                post(title: L("磁盘占用增长很快"),
+                     body: L("过去一小时内多用了 \(ByteFormat.string(grown))\(source)。"))
             }
         }
     }

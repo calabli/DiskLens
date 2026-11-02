@@ -20,6 +20,14 @@ private func signature(_ data: Data) -> Data { Data(try! SignedRules.sign(data, 
     #expect(RuleValidator.problems(in: try CleanupRuleSet.bundled()).isEmpty)
 }
 
+@Test func everyBundledRuleHasEnglishWording() throws {
+    let missing = try CleanupRuleSet.bundled().rules.filter {
+        guard let en = $0.en else { return true }
+        return en.title.isEmpty || en.explanation.isEmpty || en.consequence.isEmpty
+    }
+    #expect(missing.map(\.id) == [])
+}
+
 @Test func onlyCorrectlySignedRulesAreOpened() throws {
     let data = library(version: 2)
     #expect(try SignedRules.open(data, signature: signature(data), publicKey: publicKey).version == 2)

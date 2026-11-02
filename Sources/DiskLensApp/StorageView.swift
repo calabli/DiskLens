@@ -43,36 +43,36 @@ struct StorageView: View {
         let dataUsed = used([.data])
         let scanned = min(model.tree?.totalSize ?? 0, dataUsed)
         let scannedTitle: String = switch model.tree?.rootPath {
-        case AppModel.homePath?: "主目录（本次扫描）"
-        case AppModel.wholeDiskPath?: "你的数据（本次扫描）"
-        default: "所扫描的文件夹"
+        case AppModel.homePath?: L("主目录（本次扫描）")
+        case AppModel.wholeDiskPath?: L("你的数据（本次扫描）")
+        default: L("所扫描的文件夹")
         }
         var result: [Segment] = []
         if scanned > 0 {
             result.append(Segment(id: "scanned", title: scannedTitle,
-                                  detail: "在“概览”里能逐层查看的内容。", size: scanned, color: .accentColor))
+                                  detail: L("在“概览”里能逐层查看的内容。"), size: scanned, color: .accentColor))
         }
         result.append(Segment(
-            id: "data-other", title: scanned > 0 ? "数据卷中的其他内容" : "你的数据",
+            id: "data-other", title: scanned > 0 ? L("数据卷中的其他内容") : L("你的数据"),
             detail: scanned > 0
-                ? "扫描范围以外的应用、其他用户的文件、没有权限读取的文件夹和系统数据。"
-                : "应用、所有用户的文件和系统数据。",
+                ? L("扫描范围以外的应用、其他用户的文件、没有权限读取的文件夹和系统数据。")
+                : L("应用、所有用户的文件和系统数据。"),
             size: max(dataUsed - scanned, 0), color: .blue.opacity(0.45)))
-        result.append(Segment(id: "system", title: "macOS 系统",
-                              detail: "只读的系统卷，随系统更新变化，无法清理。",
+        result.append(Segment(id: "system", title: L("macOS 系统"),
+                              detail: L("只读的系统卷，随系统更新变化，无法清理。"),
                               size: used([.system]), color: .gray))
-        result.append(Segment(id: "support", title: "启动与恢复",
-                              detail: "Preboot、Recovery 和 Update 卷：启动、恢复模式和系统更新要用到。",
+        result.append(Segment(id: "support", title: L("启动与恢复"),
+                              detail: L("Preboot、Recovery 和 Update 卷：启动、恢复模式和系统更新要用到。"),
                               size: used([.preboot, .recovery, .update]), color: .gray.opacity(0.55)))
-        result.append(Segment(id: "vm", title: "虚拟内存",
-                              detail: "内存不够时用来交换的空间，以及休眠镜像；由系统自动管理。",
+        result.append(Segment(id: "vm", title: L("虚拟内存"),
+                              detail: L("内存不够时用来交换的空间，以及休眠镜像；由系统自动管理。"),
                               size: used([.vm]), color: .purple.opacity(0.6)))
         let other = used([.other])
         if other > 0 {
-            result.append(Segment(id: "other", title: "其他卷", detail: "同一容器里的其他 APFS 卷。",
+            result.append(Segment(id: "other", title: L("其他卷"), detail: L("同一容器里的其他 APFS 卷。"),
                                   size: other, color: .orange.opacity(0.6)))
         }
-        result.append(Segment(id: "free", title: "可用", detail: "", size: breakdown.containerFree,
+        result.append(Segment(id: "free", title: L("可用"), detail: "", size: breakdown.containerFree,
                               color: Color.primary.opacity(0.08)))
         return result.filter { $0.size > 0 }
     }

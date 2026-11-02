@@ -52,8 +52,9 @@ private struct Summary: View {
 
     private var headline: String {
         let since = comparison.previousDate.formatted(.relative(presentation: .named))
-        if comparison.delta == 0 { return "与\(since)相比没有变化" }
-        return "比\(since)\(comparison.delta > 0 ? "多了" : "少了") \(ByteFormat.string(abs(comparison.delta)))"
+        if comparison.delta == 0 { return L("与\(since)相比没有变化") }
+        let amount = ByteFormat.string(abs(comparison.delta))
+        return comparison.delta > 0 ? L("比\(since)多了 \(amount)") : L("比\(since)少了 \(amount)")
     }
 }
 
@@ -73,9 +74,9 @@ private struct ChangeRow: View {
                         .fontWeight(.medium)
                         .lineLimit(1)
                     if change.before == 0 {
-                        Tag(text: "新出现", color: .orange)
+                        Tag(text: L("新出现"), color: .orange)
                     } else if change.after == 0 {
-                        Tag(text: "已删除", color: .secondary)
+                        Tag(text: L("已删除"), color: .secondary)
                     }
                 }
                 Text(displayFolder)
