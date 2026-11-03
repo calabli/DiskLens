@@ -9,6 +9,8 @@ public struct DuplicateFile: Sendable, Hashable, Identifiable {
     /// Bytes only this file uses. A copy made by APFS cloning shares its blocks
     /// with the original, so deleting it frees next to nothing.
     public let privateSize: Int64
+    /// Bytes the file takes on disk, less than its length when APFS compressed it.
+    public let allocatedSize: Int64
 
     public var id: Int { node }
 }
@@ -30,7 +32,7 @@ public struct DuplicateGroup: Sendable, Identifiable {
     /// Space freed by deleting every copy but the first.
     public var reclaimable: Int64 { files.dropFirst().reduce(0) { $0 + $1.privateSize } }
     /// The copies already share their blocks (APFS clones), so deleting them frees little.
-    public var isMostlyClones: Bool { reclaimable < size * Int64(files.count - 1) / 4 }
+    public var isMostlyClones: Bool { reclaimable < files.dropFirst().reduce(0) { $0 + $1.allocatedSize } / 4 }
 }
 
 public struct DuplicateProgress: Sendable {
@@ -41,7 +43,8 @@ public struct DuplicateProgress: Sendable {
 /// Finds files with identical contents among the files of a scan. Only files
 /// of equal size can match, so most files are ruled out by the scan alone; the
 /// rest are compared by length, then by a hash of their first and last 16 KB,
-/// then by a full SHA-256.
+/// then by a full SHA-256. A file APFS compressed takes less space than its
+/// length, so compressed files skip the first step and are matched by length.
 public final class DuplicateFinder: @unchecked Sendable {
     public var minimumSize: Int64 = 1_000_000
     /// Leave out ~/Library, where copies usually belong to apps and are not the user's to remove.
@@ -64,24 +67,26 @@ public final class DuplicateFinder: @unchecked Sendable {
     public func find(in tree: FileTree, progress: (@Sendable (DuplicateProgress) -> Void)? = nil) throws -> [DuplicateGroup] {
         // 1. Same allocated size in the scan.
         var bySize: [Int64: [Int]] = [:]
-        for node in 1..<max(tree.count, 1)
-        where tree.kinds[node] == .file && tree.ownSizes[node] >= minimumSize {
-            bySize[tree.ownSizes[node], default: []].append(node)
+        var compressed: [Int] = []
+        for node in 1..<max(tree.count, 1) where tree.kinds[node] == .file {
+            if tree.flags(of: node).contains(.compressed) {
+                compressed.append(node)
+            } else if tree.ownSizes[node] >= minimumSize {
+                bySize[tree.ownSizes[node], default: []].append(node)
+            }
         }
-        let candidates = bySize.values.filter { $0.count > 1 }.flatMap { $0 }
+        compressed = compressed.filter { !tree.isRemoved($0) && isEligible($0, in: tree) }
+        let compressedFiles = stat(compressed, in: tree).filter { $0.length >= minimumSize }
+        // An uncompressed copy of a compressed file takes its length rounded up to whole blocks.
+        let compressedSizes = Set(compressedFiles.map { ($0.length + 4095) / 4096 * 4096 })
+        let candidates = bySize.values.filter { $0.count > 1 || compressedSizes.contains(tree.ownSizes[$0[0]]) }
+            .flatMap { $0 }
             .filter { !tree.isRemoved($0) && isEligible($0, in: tree) }
 
         // 2. Same exact length, and not another name for the same file.
-        let files = concurrentMap(candidates) { node -> Candidate? in
-            let path = tree.path(of: node)
-            var st = stat()
-            guard lstat(path, &st) == 0, st.st_mode & S_IFMT == S_IFREG else { return nil }
-            return Candidate(node: node, path: path, length: Int64(st.st_size), inode: st.st_ino,
-                             modified: Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)))
-        }
         var byLength: [Int64: [Candidate]] = [:]
-        var seenInodes = Set<UInt64>()
-        for file in files.compactMap({ $0 ?? nil }) where seenInodes.insert(file.inode).inserted {
+        var seenFiles = Set<FileID>()
+        for file in stat(candidates, in: tree) + compressedFiles where seenFiles.insert(file.id).inserted {
             byLength[file.length, default: []].append(file)
         }
         let sameLength = byLength.values.filter { $0.count > 1 }
@@ -94,16 +99,17 @@ public final class DuplicateFinder: @unchecked Sendable {
         let bytesToHash = partial.flatMap { $0 }.reduce(Int64(0)) { $0 + $1.length }
         let hashed = Counter()
         let full = try regroup(partial) { file -> String in
-            let hash = try Self.fullHash(of: file.path) { self.isCancelled }
+            let hash = try Self.fullHash(of: file.path, length: file.length) { self.isCancelled }
             progress?(DuplicateProgress(bytesHashed: hashed.add(file.length), bytesToHash: bytesToHash))
             return hash
         }
 
         return full.map { group in
-            let ordered = Self.orderedForKeeping(group, home: homePath)
+            let ordered = Self.orderedForKeeping(group, home: homePath, sizes: tree.ownSizes)
             let files = ordered.map {
                 DuplicateFile(node: $0.node, path: $0.path, modified: $0.modified,
-                              privateSize: Self.privateSize(of: $0.path) ?? tree.ownSizes[$0.node])
+                              privateSize: Self.privateSize(of: $0.path) ?? tree.ownSizes[$0.node],
+                              allocatedSize: tree.ownSizes[$0.node])
             }
             return DuplicateGroup(id: group[0].hash ?? UUID().uuidString, size: group[0].length, files: files)
         }
@@ -114,9 +120,28 @@ public final class DuplicateFinder: @unchecked Sendable {
         let node: Int
         let path: String
         let length: Int64
-        let inode: UInt64
+        let id: FileID
         let modified: Date
         var hash: String?
+    }
+
+    /// A file's volume and inode: hard links to one file share it.
+    private struct FileID: Hashable {
+        let device: Int32
+        let inode: UInt64
+    }
+
+    /// The regular files among `nodes`, with their exact length.
+    private func stat(_ nodes: [Int], in tree: FileTree) -> [Candidate] {
+        concurrentMap(nodes) { node -> Candidate? in
+            let path = tree.path(of: node)
+            var st = Darwin.stat()
+            guard lstat(path, &st) == 0, st.st_mode & S_IFMT == S_IFREG else { return nil }
+            return Candidate(node: node, path: path, length: Int64(st.st_size),
+                             id: FileID(device: st.st_dev, inode: st.st_ino),
+                             modified: Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)))
+        }
+        .compactMap { $0 ?? nil }
     }
 
     /// A file the user manages. Files inside app bundles, dependency folders
@@ -162,14 +187,18 @@ public final class DuplicateFinder: @unchecked Sendable {
         return results.values
     }
 
-    /// The copy to keep first: not in Downloads or the Trash if possible, then the oldest.
-    private static func orderedForKeeping(_ files: [Candidate], home: String) -> [Candidate] {
+    /// The copy to keep first: not in Downloads or the Trash if possible, then the one taking
+    /// the least space (a compressed copy), then the oldest.
+    private static func orderedForKeeping(_ files: [Candidate], home: String,
+                                          sizes: ChunkedArray<Int64>) -> [Candidate] {
         func penalty(_ path: String) -> Int {
             if path.hasPrefix(home + "/.Trash/") { return 2 }
             if path.hasPrefix(home + "/Downloads/") { return 1 }
             return 0
         }
-        return files.sorted { (penalty($0.path), $0.modified, $0.path) < (penalty($1.path), $1.modified, $1.path) }
+        return files.sorted {
+            (penalty($0.path), sizes[$0.node], $0.modified, $0.path) < (penalty($1.path), sizes[$1.node], $1.modified, $1.path)
+        }
     }
 
     // MARK: Reading files
@@ -191,14 +220,15 @@ public final class DuplicateFinder: @unchecked Sendable {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    static func fullHash(of path: String, cancelled: () -> Bool) throws -> String {
+    static func fullHash(of path: String, length: Int64, cancelled: () -> Bool) throws -> String {
         let fd = open(path, O_RDONLY | O_CLOEXEC)
         guard fd >= 0 else { throw ScanError.cannotRead(path: path, errno: errno) }
         defer { close(fd) }
         // Don't push the user's working set out of the file cache.
         _ = fcntl(fd, F_NOCACHE, 1)
         var hasher = SHA256()
-        var buffer = [UInt8](repeating: 0, count: 1 << 20)
+        // A small file needs no 1 MB buffer.
+        var buffer = [UInt8](repeating: 0, count: Int(min(max(length, 4096), 1 << 20)))
         while true {
             if cancelled() { throw ScanError.cancelled }
             let count = read(fd, &buffer, buffer.count)

@@ -130,3 +130,30 @@ private func random(_ count: Int) -> Data {
     #expect(date != nil)
     #expect(StorageBreakdown.snapshotDate("com.apple.os.update-9A91EDBD") == nil)
 }
+
+@Test func aCompressedCopyStillMatchesAndIsTheOneKept() throws {
+    let home = try Home()
+    let text = Data(String(repeating: "Quarterly figures, unchanged. ", count: 70_000).utf8)
+    let original = try home.write("Documents/report.txt", text)
+    // Unpacking an archive with --hfsCompression writes the copy compressed.
+    try FileManager.default.createDirectory(atPath: home.root + "/Archive", withIntermediateDirectories: true)
+    for arguments in [["-c", original, home.root + "/report.cpio"],
+                      ["-x", "--hfsCompression", home.root + "/report.cpio", home.root + "/Archive"]] {
+        let ditto = Process()
+        ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        ditto.arguments = arguments
+        try ditto.run()
+        ditto.waitUntilExit()
+    }
+    try FileManager.default.removeItem(atPath: home.root + "/report.cpio")
+
+    let tree = try DiskScanner().scan(home.root)
+    let packed = try #require(tree.node(atPath: home.root + "/Archive/report.txt"))
+    guard tree.flags(of: packed).contains(.compressed) else { return }  // Not on APFS.
+    #expect(tree.ownSizes[packed] < 100_000)
+
+    let group = try #require(home.finder().find(in: tree).first)
+    #expect(group.files.map(\.path) == [home.root + "/Archive/report.txt", original])
+    #expect(group.reclaimable >= Int64(text.count))
+    #expect(!group.isMostlyClones)
+}

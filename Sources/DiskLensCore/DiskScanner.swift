@@ -155,6 +155,11 @@ private struct Job {
     var parent: DirectoryHandle?
 }
 
+private struct HardLink: Hashable {
+    let device: Int32
+    let inode: UInt64
+}
+
 private final class TreeBuilder: @unchecked Sendable {
     /// Folders this shallow are read breadth-first, so a live view sees the whole
     /// top of the tree early; deeper ones depth-first, which keeps few folders open.
@@ -178,7 +183,8 @@ private final class TreeBuilder: @unchecked Sendable {
     private var shallowHead = 0
     private var deep: [Job] = []
     private var pending = 1
-    private var seenHardLinks = Set<UInt64>()
+    /// Volume and inode of files with more than one link, so each is counted once.
+    private var seenHardLinks = Set<HardLink>()
     private(set) var stats = ScanStats()
     private(set) var rootError: Int32?
     private(set) var isCancelled = false
@@ -297,7 +303,7 @@ private final class TreeBuilder: @unchecked Sendable {
                 }
             } else {
                 stats.files += 1
-                if entry.linkCount > 1 && !seenHardLinks.insert(entry.fileID).inserted {
+                if entry.linkCount > 1 && !seenHardLinks.insert(HardLink(device: entry.device, inode: entry.fileID)).inserted {
                     stats.duplicateHardLinks += 1
                     size = 0
                 }
