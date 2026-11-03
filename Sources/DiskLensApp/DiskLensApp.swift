@@ -106,12 +106,16 @@ struct DiskLensApp: App {
         } label: {
             // Kept to a plain title and symbol: the menu bar renders the label as an image,
             // and a richer view (with tasks or environment lookups) re-renders endlessly.
-            // A Label shows only its icon in the menu bar; one Text carries both.
+            // A Label shows only its icon in the menu bar, and an NSImage inside a Text shows
+            // nothing, so the icon and the number sit side by side.
             // Just the icon unless asked for the number; when space runs low the number shows anyway.
             if menuBarShowsSpace || monitor.isLow {
-                Text("\(Image(systemName: monitor.isLow ? "exclamationmark.triangle.fill" : "internaldrive")) \(monitor.menuBarTitle)")
+                HStack(spacing: 4) {
+                    monitor.isLow ? Image(systemName: "exclamationmark.triangle.fill") : Image(nsImage: MenuBarIcon.image)
+                    Text(monitor.menuBarTitle)
+                }
             } else {
-                Text("\(Image(systemName: "internaldrive"))")
+                Image(nsImage: MenuBarIcon.image)
             }
         }
         .menuBarExtraStyle(.window)
