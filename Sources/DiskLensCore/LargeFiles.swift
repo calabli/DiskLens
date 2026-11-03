@@ -11,6 +11,7 @@ public struct LargeFile: Sendable, Identifiable, Hashable {
     public let location: String
     /// Inside ~/Library, where files usually belong to an app rather than to the user.
     public let isAppData: Bool
+    public let flags: FileFlags
 
     public var id: Int { node }
 }
@@ -42,7 +43,8 @@ public enum LargeFileFinder {
                 category: FileCategory.of(name: tree.names[node], kind: tree.kinds[node]),
                 modified: Date(timeIntervalSince1970: TimeInterval(tree.modTimes[node])),
                 location: location,
-                isAppData: location == "~/Library" || location.hasPrefix("~/Library/")))
+                isAppData: location == "~/Library" || location.hasPrefix("~/Library/"),
+                flags: tree.flags(of: node)))
             if result.count == limit { break }
         }
         return result

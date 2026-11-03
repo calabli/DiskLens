@@ -16,6 +16,7 @@ struct FolderRow: Identifiable, Sendable {
     let modified: Date
     let isDirectory: Bool
     let category: FileCategory
+    let flags: FileFlags
     /// The scan could not list this folder, so its size is missing.
     var unreadable: UnreadableFolder?
 }
@@ -73,7 +74,9 @@ final class AppModel {
         didSet { refreshRows() }
     }
     private(set) var rows: [FolderRow] = []
-    private(set) var basket: [Int] = []
+    private(set) var basket: [Int] = [] {
+        didSet { refreshBasketFreeable() }
+    }
     private(set) var volume: VolumeInfo?
     /// Bumped whenever the tree changes, so views redo their layout.
     private(set) var treeVersion = 0 {
@@ -494,7 +497,7 @@ final class AppModel {
                              modified: Date(timeIntervalSince1970: TimeInterval(tree.modTimes[c])),
                              isDirectory: tree.kinds[c] == .directory,
                              category: FileCategory.of(name: tree.names[c], kind: tree.kinds[c]),
-                             unreadable: unreadable[c])
+                             flags: tree.flags(of: c), unreadable: unreadable[c])
         }
         .sorted(using: sortOrder)
     }
@@ -706,6 +709,30 @@ final class AppModel {
     var basketTotal: Int64 {
         let inTree = tree.map { tree in basket.reduce(Int64(0)) { $0 + tree.totalSizes[$1] } } ?? 0
         return inTree + externalBasket.reduce(0) { $0 + $1.size }
+    }
+
+    /// What emptying the Trash after trashing the basket would free: less than
+    /// `basketTotal` when some files share blocks with clones outside the basket.
+    var basketFreeable: Int64? {
+        basketTreeFreeable.map { $0 + externalBasket.reduce(0) { $0 + $1.size } }
+    }
+    private var basketTreeFreeable: Int64?
+    @ObservationIgnored private var freeableTask: Task<Void, Never>?
+
+    private func refreshBasketFreeable() {
+        freeableTask?.cancel()
+        basketTreeFreeable = nil
+        guard let tree, !basket.isEmpty else {
+            basketTreeFreeable = basket.isEmpty ? 0 : nil
+            return
+        }
+        let nodes = basket
+        freeableTask = Task {
+            let freeable = await Task.detached(priority: .userInitiated) {
+                FreeableSpace.estimate(nodes, in: tree)
+            }.value
+            if !Task.isCancelled { basketTreeFreeable = freeable }
+        }
     }
 
     /// Adds a path, as a node when the scan has it, else as an external item.

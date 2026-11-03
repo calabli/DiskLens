@@ -583,3 +583,10 @@
 "，主要来自“%@”（%@）" = ", mostly in “%@” (%@)";
 "：%@" = ": %@";
 "；" = "; ";
+
+/* File flags and freeable space */
+"macOS 已压缩存储这个文件，它占的空间比文件本身小。" = "macOS stores this file compressed, so it takes less space than its size.";
+"只存在 iCloud 上，不占这台 Mac 的空间，打开时会自动下载。" = "Stored only in iCloud. It takes no space on this Mac and downloads when opened.";
+"和其他文件共用磁盘空间（APFS 克隆），删掉它释放的空间可能比显示的少。" = "Shares disk space with another file (an APFS clone). Deleting it may free less than shown.";
+"实际约可释放 %@" = "Frees about %@";
+"有些文件和收集筐外的文件共用磁盘空间（APFS 克隆，比如在 Finder 里复制出来的文件），删掉它们释放不了这么多。" = "Some files share disk space with files outside the basket (APFS clones, such as copies made in Finder), so deleting them frees less.";

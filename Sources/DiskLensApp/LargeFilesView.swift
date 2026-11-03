@@ -134,6 +134,7 @@ struct LargeFilesView: View {
                     Text(row.name)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    FileFlagIcons(flags: row.file.flags)
                     if row.file.isAppData {
                         Text("应用数据")
                             .font(.caption2)

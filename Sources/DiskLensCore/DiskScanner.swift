@@ -173,6 +173,7 @@ private final class TreeBuilder: @unchecked Sendable {
     private var kinds: ChunkedArray<EntryKind> = [.directory]
     private var ownSizes = ChunkedArray<Int64>()
     private var modTimes: ChunkedArray<Int64> = [0]
+    private var flags: ChunkedArray<FileFlags> = [FileFlags()]
     private var shallow: [Job]
     private var shallowHead = 0
     private var deep: [Job] = []
@@ -309,6 +310,7 @@ private final class TreeBuilder: @unchecked Sendable {
             kinds.append(entry.kind)
             ownSizes.append(size)
             modTimes.append(entry.modTime)
+            flags.append(entry.flags)
 
             if entry.kind == .directory {
                 let childName = String(decoding: name, as: UTF8.self)
@@ -333,11 +335,11 @@ private final class TreeBuilder: @unchecked Sendable {
     /// the arrays happens under the lock; the roll-up and sorting run outside it.
     func makeTree(duration: Double) -> FileTree {
         condition.lock()
-        let (names, parents, kinds, ownSizes, modTimes) = (names, parents, kinds, ownSizes, modTimes)
+        let (names, parents, kinds, ownSizes, modTimes, flags) = (names, parents, kinds, ownSizes, modTimes, flags)
         var stats = stats
         condition.unlock()
         stats.duration = duration
         return FileTree(rootPath: rootPath, names: names, parents: parents, kinds: kinds,
-                        ownSizes: ownSizes, modTimes: modTimes, stats: stats)
+                        ownSizes: ownSizes, modTimes: modTimes, flags: flags, stats: stats)
     }
 }

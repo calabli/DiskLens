@@ -27,7 +27,9 @@ public struct ScanCache: Sendable {
     public let directory: URL
 
     private static let magic: UInt32 = 0x4443_4C44  // "DLCD"
-    private static let version: UInt32 = 2
+    private static let version: UInt32 = 3
+    /// Version 2 is the same without file flags; it still loads.
+    private static let versionWithoutFlags: UInt32 = 2
 
     public init(directory: URL) {
         self.directory = directory
@@ -82,6 +84,7 @@ public struct ScanCache: Sendable {
         for node in order { writer.put(tree.kinds[node].rawValue) }
         for node in order { writer.put(tree.ownSizes[node]) }
         for node in order { writer.put(tree.modTimes[node]) }
+        for node in order { writer.put(tree.flags(of: node).rawValue) }
         for node in order {
             tree.names.withUTF8(node) { bytes in
                 writer.put(UInt16(bytes.count))
@@ -99,7 +102,8 @@ public struct ScanCache: Sendable {
               let data = try? (compressed as NSData).decompressed(using: .lz4) as Data
         else { return nil }
         var reader = Reader(data: data)
-        guard reader.get(UInt32.self) == Self.magic, reader.get(UInt32.self) == Self.version,
+        guard reader.get(UInt32.self) == Self.magic, let version = reader.get(UInt32.self),
+              version == Self.version || version == Self.versionWithoutFlags,
               let scannedAt = reader.get(Double.self), let eventID = reader.get(UInt64.self),
               let journalID = reader.getString(), let storedRoot = reader.getString(), storedRoot == rootPath
         else { return nil }
@@ -122,6 +126,7 @@ public struct ScanCache: Sendable {
         var kinds = ChunkedArray<EntryKind>()
         var ownSizes = ChunkedArray<Int64>()
         var modTimes = ChunkedArray<Int64>()
+        var flags = ChunkedArray<FileFlags>()
         var names = NamePool()
         for _ in 0..<count {
             guard let parent = reader.get(Int32.self) else { return nil }
@@ -139,12 +144,16 @@ public struct ScanCache: Sendable {
             guard let time = reader.get(Int64.self) else { return nil }
             modTimes.append(time)
         }
+        for _ in 0..<(version == Self.version ? count : 0) {
+            guard let raw = reader.get(UInt8.self) else { return nil }
+            flags.append(FileFlags(rawValue: raw))
+        }
         for _ in 0..<count {
             guard let length = reader.get(UInt16.self), reader.withBytes(Int(length), { names.append(bytes: $0) })
             else { return nil }
         }
         let tree = FileTree(rootPath: rootPath, names: names, parents: parents, kinds: kinds,
-                            ownSizes: ownSizes, modTimes: modTimes, stats: stats)
+                            ownSizes: ownSizes, modTimes: modTimes, flags: flags, stats: stats)
         return CachedScan(tree: tree, scannedAt: Date(timeIntervalSince1970: scannedAt), eventID: eventID,
                           journalID: journalID.isEmpty ? nil : journalID)
     }

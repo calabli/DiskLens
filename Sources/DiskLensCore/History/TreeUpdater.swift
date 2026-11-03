@@ -67,7 +67,8 @@ private struct Update {
         } else {
             for child in old.children(of: oldNode).map(Int.init) {
                 let node = builder.add(nameOf: child, in: old.names, parent: newNode, kind: old.kinds[child],
-                                       ownSize: old.ownSizes[child], modTime: old.modTimes[child])
+                                       ownSize: old.ownSizes[child], modTime: old.modTimes[child],
+                                       flags: old.flags(of: child))
                 if old.kinds[child] == .directory {
                     try visit(oldNode: child, newNode: node, path: Self.join(path, old.names[child]))
                 }
@@ -104,7 +105,8 @@ private struct Update {
                 continue
             }
             let node = name.withUnsafeBufferPointer {
-                builder.add(name: $0, parent: newNode, kind: entry.kind, ownSize: entry.allocSize, modTime: entry.modTime)
+                builder.add(name: $0, parent: newNode, kind: entry.kind, ownSize: entry.allocSize,
+                            modTime: entry.modTime, flags: entry.flags)
             }
             guard entry.kind == .directory else { continue }
             let childName = String(decoding: name, as: UTF8.self)
@@ -133,7 +135,7 @@ private struct Update {
         for node in 1..<max(fresh.count, 1) {
             ids[node] = builder.add(nameOf: node, in: fresh.names, parent: ids[Int(fresh.parents[node])],
                                     kind: fresh.kinds[node], ownSize: fresh.ownSizes[node],
-                                    modTime: fresh.modTimes[node])
+                                    modTime: fresh.modTimes[node], flags: fresh.flags(of: node))
         }
         for folder in fresh.stats.unreadable { builder.stats.noteUnreadable(folder.path, code: folder.code) }
         builder.stats.unreadableDirectories += fresh.stats.unreadableDirectories - fresh.stats.unreadable.count
@@ -152,6 +154,7 @@ private struct TreeArrays {
     var kinds = ChunkedArray<EntryKind>()
     var ownSizes = ChunkedArray<Int64>()
     var modTimes = ChunkedArray<Int64>()
+    var flags = ChunkedArray<FileFlags>()
     var stats = ScanStats()
 
     mutating func addRoot(_ path: String, ownSize: Int64, modTime: Int64) {
@@ -160,32 +163,35 @@ private struct TreeArrays {
         kinds.append(.directory)
         ownSizes.append(ownSize)
         modTimes.append(modTime)
+        flags.append([])
         stats.directories += 1
     }
 
     mutating func add(name: UnsafeBufferPointer<UInt8>, parent: Int32, kind: EntryKind,
-                      ownSize: Int64, modTime: Int64) -> Int32 {
+                      ownSize: Int64, modTime: Int64, flags: FileFlags) -> Int32 {
         names.append(bytes: name)
-        return finishAdding(parent: parent, kind: kind, ownSize: ownSize, modTime: modTime)
+        return finishAdding(parent: parent, kind: kind, ownSize: ownSize, modTime: modTime, flags: flags)
     }
 
     mutating func add(nameOf node: Int, in pool: NamePool, parent: Int32, kind: EntryKind,
-                      ownSize: Int64, modTime: Int64) -> Int32 {
+                      ownSize: Int64, modTime: Int64, flags: FileFlags) -> Int32 {
         names.append(node, of: pool)
-        return finishAdding(parent: parent, kind: kind, ownSize: ownSize, modTime: modTime)
+        return finishAdding(parent: parent, kind: kind, ownSize: ownSize, modTime: modTime, flags: flags)
     }
 
-    private mutating func finishAdding(parent: Int32, kind: EntryKind, ownSize: Int64, modTime: Int64) -> Int32 {
+    private mutating func finishAdding(parent: Int32, kind: EntryKind, ownSize: Int64, modTime: Int64,
+                                       flags: FileFlags) -> Int32 {
         parents.append(parent)
         kinds.append(kind)
         ownSizes.append(ownSize)
         modTimes.append(modTime)
+        self.flags.append(flags)
         if kind == .directory { stats.directories += 1 } else { stats.files += 1 }
         return Int32(parents.count - 1)
     }
 
     func makeTree(rootPath: String, stats: ScanStats) -> FileTree {
         FileTree(rootPath: rootPath, names: names, parents: parents, kinds: kinds,
-                 ownSizes: ownSizes, modTimes: modTimes, stats: stats)
+                 ownSizes: ownSizes, modTimes: modTimes, flags: flags, stats: stats)
     }
 }

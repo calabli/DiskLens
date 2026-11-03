@@ -7,6 +7,20 @@ public enum EntryKind: UInt8, Sendable, BitwiseCopyable {
     case other
 }
 
+/// What the file system says about a file beyond its size, read with the scan at no extra cost.
+public struct FileFlags: OptionSet, Hashable, Sendable, BitwiseCopyable {
+    public let rawValue: UInt8
+    public init(rawValue: UInt8) { self.rawValue = rawValue }
+
+    /// Kept only in iCloud (or another file provider): it takes no space here until opened.
+    public static let cloudOnly = FileFlags(rawValue: 1 << 0)
+    /// Stored compressed by APFS, so it takes less space than its length.
+    public static let compressed = FileFlags(rawValue: 1 << 1)
+    /// May share blocks with another file (an APFS clone, as Finder makes when copying),
+    /// so deleting it can free less than its size.
+    public static let mayShareBlocks = FileFlags(rawValue: 1 << 2)
+}
+
 /// One directory entry as returned by `getattrlistbulk`.
 struct RawEntry {
     /// Where the name's UTF-8 bytes sit in the `names` buffer passed to `read`.
@@ -18,6 +32,7 @@ struct RawEntry {
     var linkCount: UInt32
     var device: Int32
     var modTime: Int64
+    var flags: FileFlags = []
 }
 
 /// Reads whole directories in bulk with `getattrlistbulk(2)`, which returns the
@@ -31,9 +46,11 @@ final class DirectoryReader {
         buffer = .allocate(byteCount: bufferSize, alignment: 16)
         attrs.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         attrs.commonattr = bits(ATTR_CMN_RETURNED_ATTRS) | bits(ATTR_CMN_NAME) | bits(ATTR_CMN_ERROR)
-            | bits(ATTR_CMN_DEVID) | bits(ATTR_CMN_OBJTYPE) | bits(ATTR_CMN_MODTIME) | bits(ATTR_CMN_FILEID)
+            | bits(ATTR_CMN_DEVID) | bits(ATTR_CMN_OBJTYPE) | bits(ATTR_CMN_MODTIME) | bits(ATTR_CMN_FLAGS) | bits(ATTR_CMN_FILEID)
         attrs.dirattr = bits(ATTR_DIR_ALLOCSIZE)
         attrs.fileattr = bits(ATTR_FILE_LINKCOUNT) | bits(ATTR_FILE_ALLOCSIZE)
+        // With FSOPT_ATTR_CMN_EXTENDED the fork attributes are extended common ones.
+        attrs.forkattr = bits(ATTR_CMNEXT_EXT_FLAGS)
     }
 
     deinit {
@@ -47,7 +64,7 @@ final class DirectoryReader {
     /// The caller opens and closes `fd`.
     func read(directory fd: Int32, into entries: inout [RawEntry], names: inout [UInt8]) -> Int32 {
         while true {
-            let count = getattrlistbulk(fd, &attrs, buffer.baseAddress, buffer.count, 0)
+            let count = getattrlistbulk(fd, &attrs, buffer.baseAddress, buffer.count, UInt64(FSOPT_ATTR_CMN_EXTENDED))
             if count < 0 { return errno }
             if count == 0 { return 0 }
 
@@ -63,7 +80,7 @@ final class DirectoryReader {
     }
 
     // Layout per entry: length, returned bitmap, ATTR_CMN_ERROR (always first, see
-    // getattrlistbulk(2)), then common, dir and file attributes in bit order.
+    // getattrlistbulk(2)), then common, dir, file and extended common attributes in bit order.
     // Only attributes flagged in the returned bitmap are present.
     private func parse(_ start: UnsafeMutableRawPointer, names: inout [UInt8]) -> RawEntry? {
         var field = start + MemoryLayout<UInt32>.size
@@ -107,6 +124,12 @@ final class DirectoryReader {
             entry.modTime = Int64(field.loadUnaligned(as: timespec.self).tv_sec)
             field += MemoryLayout<timespec>.size
         }
+        if returned.commonattr & bits(ATTR_CMN_FLAGS) != 0 {
+            let flags = field.loadUnaligned(as: UInt32.self)
+            if flags & UInt32(SF_DATALESS) != 0 { entry.flags.insert(.cloudOnly) }
+            if flags & UInt32(UF_COMPRESSED) != 0 { entry.flags.insert(.compressed) }
+            field += MemoryLayout<UInt32>.size
+        }
         if returned.commonattr & bits(ATTR_CMN_FILEID) != 0 {
             entry.fileID = field.loadUnaligned(as: UInt64.self)
             field += MemoryLayout<UInt64>.size
@@ -124,6 +147,12 @@ final class DirectoryReader {
         if returned.fileattr & bits(ATTR_FILE_ALLOCSIZE) != 0 {
             entry.allocSize = field.loadUnaligned(as: off_t.self)
             field += MemoryLayout<off_t>.size
+        }
+
+        if returned.forkattr & bits(ATTR_CMNEXT_EXT_FLAGS) != 0 {
+            let flags = field.loadUnaligned(as: UInt64.self)
+            if flags & UInt64(EF_MAY_SHARE_BLOCKS) != 0 { entry.flags.insert(.mayShareBlocks) }
+            field += MemoryLayout<UInt64>.size
         }
         return entry
     }

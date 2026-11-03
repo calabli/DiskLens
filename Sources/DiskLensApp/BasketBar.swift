@@ -30,6 +30,12 @@ struct BasketBar: View {
                 Text("共 \(ByteFormat.string(model.basketTotal))")
                     .monospacedDigit()
                     .fontWeight(.semibold)
+                if let freeable = model.basketFreeable, model.basketTotal - freeable >= 10_000_000 {
+                    Text("实际约可释放 \(ByteFormat.string(freeable))")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .help("有些文件和收集筐外的文件共用磁盘空间（APFS 克隆，比如在 Finder 里复制出来的文件），删掉它们释放不了这么多。")
+                }
                 Button("清空") { model.clearBasket() }
                 Button("移到废纸篓…") { confirming = true }
                     .buttonStyle(.borderedProminent)

@@ -18,6 +18,8 @@ public struct FileTree: Sendable {
     /// Number of files at or under the node.
     public private(set) var fileCounts: [Int32]
     public let modTimes: ChunkedArray<Int64>
+    /// Empty for trees saved before flags were recorded; read them with `flags(of:)`.
+    let flags: ChunkedArray<FileFlags>
     public let stats: ScanStats
 
     // Children in CSR form: the live children of node i are
@@ -31,7 +33,8 @@ public struct FileTree: Sendable {
     public var totalSize: Int64 { totalSizes.first ?? 0 }
 
     init(rootPath: String, names: NamePool, parents: ChunkedArray<Int32>, kinds: ChunkedArray<EntryKind>,
-         ownSizes: ChunkedArray<Int64>, modTimes: ChunkedArray<Int64>, stats: ScanStats) {
+         ownSizes: ChunkedArray<Int64>, modTimes: ChunkedArray<Int64>, flags: ChunkedArray<FileFlags> = [],
+         stats: ScanStats) {
         let n = names.count
         var totals = [Int64](repeating: 0, count: n)
         var files = [Int32](repeating: 0, count: n)
@@ -67,11 +70,16 @@ public struct FileTree: Sendable {
         self.totalSizes = totals
         self.fileCounts = files
         self.modTimes = modTimes
+        self.flags = flags
         self.stats = stats
         self.childStart = start
         self.childEnd = Array(start.dropFirst())
         self.childIndex = index
         self.removed = [Bool](repeating: false, count: n)
+    }
+
+    public func flags(of node: Int) -> FileFlags {
+        node < flags.count ? flags[node] : []
     }
 
     /// Children of `node`, largest first.

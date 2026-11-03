@@ -177,3 +177,50 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     #expect(a.stats.files == 60 && b.stats.files == 60)
     #expect(a.stats.unreadableDirectories == 0 && b.stats.unreadableDirectories == 0)
 }
+
+@Test func clonesAreFlaggedAndCountedOnceWhenFreeing() throws {
+    let box = try Sandbox()
+    try box.write("a/original.bin", bytes: 1_000_000)
+    try box.write("c/other.bin", bytes: 1_000_000)
+    try FileManager.default.createDirectory(atPath: box.root + "/b", withIntermediateDirectories: true)
+    guard clonefile(box.root + "/a/original.bin", box.root + "/b/copy.bin", 0) == 0 else {
+        return  // Not on APFS.
+    }
+
+    let tree = try DiskScanner().scan(box.root)
+    let (a, b, c) = (try #require(node(tree, "a")), try #require(node(tree, "b")), try #require(node(tree, "c")))
+    #expect(tree.flags(of: try #require(node(tree, "b/copy.bin"))).contains(.mayShareBlocks))
+    #expect(!tree.flags(of: try #require(node(tree, "c/other.bin"))).contains(.mayShareBlocks))
+
+    // The copy alone frees almost nothing: the original still uses its blocks.
+    #expect(FreeableSpace.estimate([b], in: tree) < 100_000)
+    // Both copies together free the shared blocks once.
+    let both = FreeableSpace.estimate([a, b], in: tree)
+    #expect(abs(both - (tree.totalSizes[a] + tree.totalSizes[b] - box.allocated("b/copy.bin"))) < 100_000)
+    #expect(FreeableSpace.estimate([c], in: tree) == tree.totalSizes[c])
+}
+
+@Test func compressedFilesAreFlaggedAndFlagsSurviveTheCache() throws {
+    let box = try Sandbox()
+    let text = String(repeating: "DiskLens compresses well. ", count: 20_000)
+    try text.write(toFile: box.root + "/plain.txt", atomically: true, encoding: .utf8)
+    // Copying on the same volume makes a clone, so pack it and unpack it compressed.
+    for arguments in [["-c", box.root + "/plain.txt", box.root + "/plain.cpio"],
+                      ["-x", "--hfsCompression", box.root + "/plain.cpio", box.root + "/packed"]] {
+        let ditto = Process()
+        ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        ditto.arguments = arguments
+        try ditto.run()
+        ditto.waitUntilExit()
+    }
+
+    let tree = try DiskScanner().scan(box.root)
+    let packed = try #require(node(tree, "packed/plain.txt"))
+    #expect(tree.flags(of: packed).contains(.compressed))
+    #expect(!tree.flags(of: try #require(node(tree, "plain.txt"))).contains(.compressed))
+
+    let cache = ScanCache(directory: URL(fileURLWithPath: box.root + "/cache"))
+    try cache.save(CachedScan(tree: tree, scannedAt: Date(), eventID: 0, journalID: nil))
+    let loaded = try #require(cache.load(rootPath: box.root)).tree
+    #expect(loaded.flags(of: try #require(node(loaded, "packed/plain.txt"))).contains(.compressed))
+}

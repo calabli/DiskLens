@@ -209,22 +209,9 @@ public final class DuplicateFinder: @unchecked Sendable {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Bytes of the file not shared with any clone (`ATTR_CMNEXT_PRIVATESIZE`).
+    /// Bytes of the file not shared with any clone.
     static func privateSize(of path: String) -> Int64? {
-        var attrs = attrlist()
-        attrs.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
-        attrs.commonattr = attrgroup_t(truncatingIfNeeded: ATTR_CMN_RETURNED_ATTRS)
-        attrs.forkattr = attrgroup_t(ATTR_CMNEXT_PRIVATESIZE)
-        var buffer = [UInt8](repeating: 0, count: 64)
-        let result = buffer.withUnsafeMutableBytes {
-            getattrlist(path, &attrs, $0.baseAddress, $0.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW))
-        }
-        guard result == 0 else { return nil }
-        return buffer.withUnsafeBytes { raw -> Int64? in
-            let returned = raw.loadUnaligned(fromByteOffset: 4, as: attribute_set_t.self)
-            guard returned.forkattr & attrgroup_t(ATTR_CMNEXT_PRIVATESIZE) != 0 else { return nil }
-            return raw.loadUnaligned(fromByteOffset: 4 + MemoryLayout<attribute_set_t>.size, as: off_t.self)
-        }
+        CloneInfo.of(path)?.privateSize
     }
 }
 

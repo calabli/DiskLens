@@ -16,6 +16,7 @@ struct FolderTable: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .opacity(model.isInBasket(row.id) ? 0.45 : 1)
+                    FileFlagIcons(flags: row.flags)
                     if let folder = row.unreadable {
                         Image(systemName: "lock.fill")
                             .font(.caption)
@@ -85,6 +86,32 @@ struct FolderTable: View {
         .onKeyPress(.return) {
             if let selection = model.selection { model.open(selection) }
             return .handled
+        }
+    }
+}
+
+/// Small marks for files that take less space than their size suggests.
+struct FileFlagIcons: View {
+    let flags: FileFlags
+
+    var body: some View {
+        if flags.contains(.cloudOnly) {
+            Image(systemName: "icloud")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help("只存在 iCloud 上，不占这台 Mac 的空间，打开时会自动下载。")
+        }
+        if flags.contains(.mayShareBlocks) {
+            Image(systemName: "square.on.square")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help("和其他文件共用磁盘空间（APFS 克隆），删掉它释放的空间可能比显示的少。")
+        }
+        if flags.contains(.compressed) {
+            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help("macOS 已压缩存储这个文件，它占的空间比文件本身小。")
         }
     }
 }
