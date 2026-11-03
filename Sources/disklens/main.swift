@@ -128,7 +128,7 @@ do {
         if let cached = cache.load(rootPath: rootPath) {
             print("loaded cached scan from \(cached.scannedAt.formatted()) in \(seconds(since: started))")
             started = Date()
-            let changes = cached.journalID == journalID
+            let changes = cached.journalID == journalID && cached.tree.hasFileFlags
                 ? ChangeJournal.changes(under: rootPath, since: cached.eventID) : nil
             if let changes {
                 print("journal: \(changes.folders.count) changed folders, \(changes.subtrees.count) subtrees in \(seconds(since: started))")

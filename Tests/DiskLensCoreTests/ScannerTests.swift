@@ -223,4 +223,6 @@ private func node(_ tree: FileTree, _ relative: String) -> Int? {
     try cache.save(CachedScan(tree: tree, scannedAt: Date(), eventID: 0, journalID: nil))
     let loaded = try #require(cache.load(rootPath: box.root)).tree
     #expect(loaded.flags(of: try #require(node(loaded, "packed/plain.txt"))).contains(.compressed))
+    #expect(loaded.hasFileFlags)
+    #expect(try TreeUpdater.update(loaded, applying: ChangeSet(folders: [], subtrees: [])).hasFileFlags)
 }

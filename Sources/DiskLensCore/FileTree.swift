@@ -78,6 +78,10 @@ public struct FileTree: Sendable {
         self.removed = [Bool](repeating: false, count: n)
     }
 
+    /// False for a tree saved by a version that did not record file flags. Bringing it up
+    /// to date would keep them missing in unchanged folders, so scan it afresh instead.
+    public var hasFileFlags: Bool { flags.count == count }
+
     public func flags(of node: Int) -> FileFlags {
         node < flags.count ? flags[node] : []
     }

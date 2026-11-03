@@ -256,7 +256,7 @@ final class AppModel {
         let path = base.tree.rootPath
         let result = await Task.detached(priority: .userInitiated) { () -> Result<(FileTree, Bool), Error> in
             Result {
-                if base.journalID != nil, base.journalID == journalID,
+                if base.tree.hasFileFlags, base.journalID != nil, base.journalID == journalID,
                    let changes = ChangeJournal.changes(under: path, since: base.eventID) {
                     return (try TreeUpdater.update(base.tree, applying: changes), false)
                 }
