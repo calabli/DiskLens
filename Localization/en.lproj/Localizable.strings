@@ -590,3 +590,32 @@
 "和其他文件共用磁盘空间（APFS 克隆），删掉它释放的空间可能比显示的少。" = "Shares disk space with another file (an APFS clone). Deleting it may free less than shown.";
 "实际约可释放 %@" = "Frees about %@";
 "有些文件和收集筐外的文件共用磁盘空间（APFS 克隆，比如在 Finder 里复制出来的文件），删掉它们释放不了这么多。" = "Some files share disk space with files outside the basket (APFS clones, such as copies made in Finder), so deleting them frees less.";
+
+/* Storage categories */
+"/usr/local 和 /opt 里的软件，比如用 Homebrew 安装的工具。" = "Software in /usr/local and /opt, such as tools installed with Homebrew.";
+"macOS 没有公开这些分类的算法，这里是按文件夹估算的，和系统设置里的数字接近，但不会完全相同。已减去 %@ 可清除空间。" = "macOS doesn't publish how it works these out, so these are estimates from folders: close to System Settings, but not identical. %@ of purgeable space is left out.";
+"下载到这台 Mac 的动态壁纸和屏保视频。删除后，用到时会重新下载。" = "Aerial wallpaper and screen saver videos downloaded to this Mac. If deleted, they download again when needed.";
+"临时文件" = "Temporary Files";
+"交换文件" = "Swap Files";
+"其他用户与共享" = "Other Users & Shared";
+"内存不够时使用的交换文件和休眠镜像，由 macOS 管理。" = "Swap files for when memory runs short, and the sleep image. Managed by macOS.";
+"动态壁纸" = "Aerial Wallpapers";
+"去清理" = "Clean Up";
+"命令行工具" = "Command Line Tools";
+"字典、语音、翻译、字体等，由 macOS 下载和管理，不能手动清理。" = "Dictionaries, voices, translations, fonts and more, downloaded and managed by macOS. Can't be cleaned by hand.";
+"应用和系统的缓存。其中常见的几类可以在清理建议里处理，其余由应用自己管理。" = "App and system caches. Suggestions covers the common ones; apps manage the rest themselves.";
+"应用和系统的运行记录。" = "Activity records from apps and the system.";
+"应用程序" = "Applications";
+"开发者" = "Developer";
+"扫描完成后，这里会显示各分类的大小。" = "Category sizes appear here when the scan finishes.";
+"按系统设置的分类" = "By System Settings Category";
+"有些文件夹没有权限读取，所以应用程序、邮件和照片会偏小，系统数据会偏大。开启完全磁盘访问权限后重新扫描会更准。" = "Some folders couldn't be read, so Applications, Mail and Photos look smaller and System Data larger. Turn on Full Disk Access and scan again for better figures.";
+"没有算进上面各项的内容，包括没有权限读取的部分。这一项是估算的。" = "Everything not counted above, including what couldn't be read. This is an estimate.";
+"照片" = "Photos";
+"系统会自动清理。运行中的应用可能正在使用，不建议手动删除。" = "The system clears these on its own. Running apps may be using them, so deleting them by hand isn't recommended.";
+"系统数据" = "System Data";
+"系统数据库" = "System Databases";
+"系统数据里有什么" = "What's in System Data";
+"系统数据里有什么，要扫描整个磁盘才知道。" = "Scan the whole disk to see what's in System Data.";
+"系统的数据库和索引，不能手动清理。" = "System databases and indexes. Can't be cleaned by hand.";
+"系统资源" = "System Assets";

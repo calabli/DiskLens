@@ -7,6 +7,7 @@ struct StorageView: View {
     @Environment(AppModel.self) private var model
     @State private var breakdown: StorageBreakdown?
     @State private var failed = false
+    @State private var categories: StorageCategories?
 
     private struct Segment: Identifiable {
         let id: String
@@ -32,6 +33,11 @@ struct StorageView: View {
             let result = await Task.detached { try? StorageBreakdown.load() }.value
             breakdown = result
             failed = result == nil
+        }
+        .task(id: "\(model.treeVersion) \(breakdown != nil)") {
+            categories = nil
+            guard let breakdown, let tree = model.tree, tree.rootPath == AppModel.wholeDiskPath else { return }
+            categories = await Task.detached { StorageCategories(tree: tree, breakdown: breakdown) }.value
         }
     }
 
@@ -123,9 +129,149 @@ struct StorageView: View {
                     .foregroundStyle(.secondary)
                 }
 
+                if UserHome.demoPath == nil {
+                    settingsCategories(breakdown)
+                }
+
                 snapshots(breakdown.snapshots)
             }
             .padding(24)
+        }
+    }
+
+    /// The categories of System Settings › Storage, which need a scan of the whole disk.
+    @ViewBuilder
+    private func settingsCategories(_ breakdown: StorageBreakdown) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("按系统设置的分类")
+                .font(.headline)
+            if let categories {
+                let unreadable = model.tree?.stats.unreadable.contains { $0.needsFullDiskAccess } ?? false
+                Text("macOS 没有公开这些分类的算法，这里是按文件夹估算的，和系统设置里的数字接近，但不会完全相同。已减去 \(ByteFormat.string(breakdown.purgeable)) 可清除空间。")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if unreadable {
+                    Label("有些文件夹没有权限读取，所以应用程序、邮件和照片会偏小，系统数据会偏大。开启完全磁盘访问权限后重新扫描会更准。",
+                          systemImage: "lock.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
+                VStack(spacing: 0) {
+                    ForEach(CategoryRow.all, id: \.title) { row in
+                        categoryRow(row, size: categories.sizes[row.category, default: 0])
+                    }
+                }
+                systemData(categories)
+            } else if model.isScanning {
+                Text("扫描完成后，这里会显示各分类的大小。")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("系统数据里有什么，要扫描整个磁盘才知道。")
+                    .foregroundStyle(.secondary)
+                Button("扫描整个磁盘") { model.scan(AppModel.wholeDiskPath) }
+            }
+        }
+    }
+
+    private func categoryRow(_ row: CategoryRow, size: Int64) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: row.symbol)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+                Text(verbatim: row.title)
+                    .fontWeight(.medium)
+                Spacer()
+                Text(ByteFormat.string(size))
+                    .monospacedDigit()
+                    .fontWeight(.medium)
+            }
+            .padding(.vertical, 7)
+            Divider()
+        }
+    }
+
+    /// What System Data is made of, largest first, since that is the category nothing else explains.
+    private func systemData(_ categories: StorageCategories) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("系统数据里有什么")
+                .font(.headline)
+                .padding(.top, 14)
+                .padding(.bottom, 4)
+            ForEach(partsLargestFirst(categories), id: \.row.title) { row, size in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: row.title).fontWeight(.medium)
+                        Text(verbatim: row.detail).font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if row.canClean {
+                        Button("去清理") { model.section = .cleanup }
+                    }
+                    Text(ByteFormat.string(size))
+                        .monospacedDigit()
+                        .fontWeight(.medium)
+                        .frame(minWidth: 72, alignment: .trailing)
+                }
+                .padding(.vertical, 8)
+                Divider()
+            }
+        }
+    }
+
+    /// The parts with something in them, largest first and "other" always last.
+    private func partsLargestFirst(_ categories: StorageCategories) -> [(row: SystemPartRow, size: Int64)] {
+        let parts: [(row: SystemPartRow, size: Int64)] = SystemPartRow.all.compactMap { row in
+            let size = categories.systemParts[row.part, default: 0]
+            return size > 0 ? (row, size) : nil
+        }
+        let named = parts.filter { $0.row.part != .other }.sorted { $0.size > $1.size }
+        return named + parts.filter { $0.row.part == .other }
+    }
+
+    private struct CategoryRow {
+        let category: StorageCategories.Category
+        let title: String
+        let symbol: String
+
+        static var all: [CategoryRow] {
+            [CategoryRow(category: .developer, title: L("开发者"), symbol: "hammer"),
+             CategoryRow(category: .documents, title: L("文稿"), symbol: "doc"),
+             CategoryRow(category: .applications, title: L("应用程序"), symbol: "app.dashed"),
+             CategoryRow(category: .mail, title: L("邮件"), symbol: "envelope"),
+             CategoryRow(category: .photos, title: L("照片"), symbol: "photo"),
+             CategoryRow(category: .iCloudDrive, title: L("iCloud 云盘"), symbol: "icloud"),
+             CategoryRow(category: .otherUsers, title: L("其他用户与共享"), symbol: "person.2"),
+             CategoryRow(category: .macOS, title: "macOS", symbol: "laptopcomputer"),
+             CategoryRow(category: .systemData, title: L("系统数据"), symbol: "ellipsis.circle")]
+        }
+    }
+
+    private struct SystemPartRow {
+        let part: StorageCategories.SystemPart
+        let title: String
+        let detail: String
+        var canClean = false
+
+        static var all: [SystemPartRow] {
+            [SystemPartRow(part: .wallpapers, title: L("动态壁纸"),
+                           detail: L("下载到这台 Mac 的动态壁纸和屏保视频。删除后，用到时会重新下载。"), canClean: true),
+             SystemPartRow(part: .caches, title: L("缓存"),
+                           detail: L("应用和系统的缓存。其中常见的几类可以在清理建议里处理，其余由应用自己管理。"), canClean: true),
+             SystemPartRow(part: .systemAssets, title: L("系统资源"),
+                           detail: L("字典、语音、翻译、字体等，由 macOS 下载和管理，不能手动清理。")),
+             SystemPartRow(part: .temporaryFiles, title: L("临时文件"),
+                           detail: L("系统会自动清理。运行中的应用可能正在使用，不建议手动删除。")),
+             SystemPartRow(part: .swap, title: L("交换文件"),
+                           detail: L("内存不够时使用的交换文件和休眠镜像，由 macOS 管理。")),
+             SystemPartRow(part: .databases, title: L("系统数据库"),
+                           detail: L("系统的数据库和索引，不能手动清理。")),
+             SystemPartRow(part: .logs, title: L("日志"),
+                           detail: L("应用和系统的运行记录。"), canClean: true),
+             SystemPartRow(part: .commandLineTools, title: L("命令行工具"),
+                           detail: L("/usr/local 和 /opt 里的软件，比如用 Homebrew 安装的工具。")),
+             SystemPartRow(part: .other, title: L("其他"),
+                           detail: L("没有算进上面各项的内容，包括没有权限读取的部分。这一项是估算的。"))]
         }
     }
 
