@@ -2,7 +2,7 @@ import DiskLensCore
 import Foundation
 
 let usage = """
-    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest] [--use-cache] [--duplicates]
+    usage: disklens <path> [--top N] [--depth D] [--threads N] [--all-volumes] [--kb] [--suggest] [--use-cache] [--duplicates] [--similar-photos]
 
       --top N        largest N children to list per level (default 15)
       --depth D      how many levels to expand (default 1)
@@ -10,6 +10,7 @@ let usage = """
       --all-volumes  descend into other mounted volumes
       --kb           print only the total in 1024-byte blocks, like `du -sk`
       --suggest      print cleanup suggestions instead of the largest items
+      --similar-photos print groups of photos that look alike
       --app NAME     list everything an installed app has on disk (no path needed)
       --dev          list installed toolchains, simulators, Docker images and caches
       --duplicates   list files with identical contents (1 MB and larger, outside ~/Library)
@@ -31,6 +32,7 @@ var top = 15
 var depth = 1
 var kbOnly = false
 var suggest = false
+var similarPhotos = false
 var useCache = false
 var duplicates = false
 var devTools = false
@@ -53,6 +55,7 @@ while let arg = args.next() {
     case "--all-volumes": options.stayOnVolume = false
     case "--kb": kbOnly = true
     case "--suggest": suggest = true
+    case "--similar-photos": similarPhotos = true
     case "--use-cache": useCache = true
     case "--duplicates": duplicates = true
     case "--dev": devTools = true
@@ -175,6 +178,20 @@ if duplicates {
         print("\(ByteFormat.string(group.reclaimable).padding(toLength: 9, withPad: " ", startingAt: 0)) \(group.files.count) × \(ByteFormat.string(group.size))\(clones)")
         for file in group.files {
             print("      \(file == group.files.first ? "keep" : "    ") \((file.path as NSString).abbreviatingWithTildeInPath)")
+        }
+    }
+    exit(0)
+}
+
+if similarPhotos {
+    let started = Date()
+    let groups = try SimilarPhotoFinder().find(in: tree)
+    let total = groups.reduce(Int64(0)) { $0 + $1.reclaimable }
+    print("\(groups.count) groups, \(ByteFormat.string(total)) to free, in \(String(format: "%.2f", Date().timeIntervalSince(started))) s\n")
+    for group in groups.prefix(top) {
+        print("\(ByteFormat.string(group.reclaimable))")
+        for photo in group.photos {
+            print("    \(photo.width)×\(photo.height)  \(photo.path)")
         }
     }
     exit(0)

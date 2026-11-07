@@ -61,6 +61,10 @@ struct DiskLensApp: App {
                         while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
                         model.findDuplicates(minimumSize: 1_000_000, includeLibrary: false)
                     }
+                    if args.contains("--find-similar-photos") {
+                        while model.tree == nil || model.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
+                        model.findSimilarPhotos(similarity: .standard)
+                    }
                     if let i = args.firstIndex(of: "--show"), i + 1 < args.count {
                         switch args[i + 1] {
                         case "cleanup": model.section = .cleanup
@@ -68,6 +72,7 @@ struct DiskLensApp: App {
                         case "changes": model.section = .changes
                         case "timeline": model.section = .timeline
                         case "duplicates": model.section = .duplicates
+                        case "similar-photos": model.section = .similarPhotos
                         case "storage": model.section = .storage
                         case "apps": model.section = .apps
                         case "history": model.section = .history

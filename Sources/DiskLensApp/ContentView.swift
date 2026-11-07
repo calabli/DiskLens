@@ -38,10 +38,15 @@ struct ContentView: View {
         .toolbar { MainToolbar() }
         .navigationTitle(model.tree.map { $0.rootPath.abbreviatingHome } ?? "DiskLens")
         .quickLookPreview($model.previewURL)
-        .sheet(isPresented: Binding(get: { model.showUnreadable && !access.showGuide },
+        .sheet(isPresented: Binding(get: { model.showUnreadable && !access.showGuide && !access.showWelcome },
                                     set: { model.showUnreadable = $0 })) {
             UnreadableFoldersSheet()
                 .environment(model)
+                .environment(access)
+        }
+        .sheet(isPresented: Binding(get: { access.showWelcome }, set: { access.showWelcome = $0 }),
+               onDismiss: { access.showGuideIfNeeded() }) {
+            WelcomeSheet()
                 .environment(access)
         }
         .sheet(isPresented: Binding(get: { access.showGuide }, set: { access.showGuide = $0 })) {
@@ -50,7 +55,7 @@ struct ContentView: View {
                 .environment(access)
                 .environment(recording)
         }
-        .sheet(item: Binding(get: { access.showGuide ? nil : trashWatcher.pending.map(PendingLeftovers.init) },
+        .sheet(item: Binding(get: { access.showGuide || access.showWelcome ? nil : trashWatcher.pending.map(PendingLeftovers.init) },
                              set: { if $0 == nil { trashWatcher.pending = nil } })) { pending in
             LeftoversSheet(footprint: pending.footprint)
                 .environment(model)
@@ -244,6 +249,9 @@ struct MainSplitView: View {
                 Label("重复文件", systemImage: "doc.on.doc")
                     .badge(duplicatesBadge)
                     .tag(AppModel.Section.duplicates)
+                Label("相似照片", systemImage: "photo.on.rectangle.angled")
+                    .badge(similarPhotosBadge)
+                    .tag(AppModel.Section.similarPhotos)
                 Label("开发环境", systemImage: "hammer")
                     .tag(AppModel.Section.devTools)
                 Label("清理记录", systemImage: "arrow.uturn.backward.circle")
@@ -272,6 +280,8 @@ struct MainSplitView: View {
                     TimelineView()
                 case .duplicates:
                     DuplicatesView()
+                case .similarPhotos:
+                    SimilarPhotosView()
                 case .storage:
                     StorageView()
                 case .apps:
@@ -296,6 +306,12 @@ struct MainSplitView: View {
                                                   includeLibrary: duplicatesIncludeLibrary)
             .filter { !$0.isMostlyClones }
             .reduce(Int64(0)) { $0 + $1.reclaimable }
+        return Text(ByteFormat.string(reclaimable))
+    }
+
+    private var similarPhotosBadge: Text? {
+        guard let groups = model.similarPhotoGroups, !model.similarPhotosAreStale else { return nil }
+        let reclaimable = SimilarPhotosView.remaining(groups, in: tree).reduce(Int64(0)) { $0 + $1.reclaimable }
         return Text(ByteFormat.string(reclaimable))
     }
 

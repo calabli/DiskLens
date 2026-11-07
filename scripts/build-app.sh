@@ -54,6 +54,7 @@ PLIST
 # Resources of the core library, such as the cleanup rules (found through Bundle.module).
 cp -R "$BIN_DIR/DiskLens_DiskLensCore.bundle" "$APP/Contents/Resources/"
 cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp LICENSE "$APP/Contents/Resources/LICENSE"
 # Interface languages: the Chinese text in the code is the key, en.lproj translates it.
 cp -R Localization/*.lproj "$APP/Contents/Resources/"
 

@@ -15,8 +15,11 @@ final class AccessModel {
     var showGuide = false {
         didSet { if showGuide { watch() } }
     }
+    /// The welcome sheet, shown once before anything else.
+    var showWelcome = false
 
     static let shownKey = "onboarding.fullDiskAccessShown"
+    static let welcomeShownKey = "onboarding.welcomeShown"
 
     var isGranted: Bool { status == .granted }
 
@@ -28,8 +31,21 @@ final class AccessModel {
             .flatMap { FullDiskAccess.Status(rawValue: $0.value) }
     }
 
-    /// Shows the guide once, on the first launch without access.
+    /// Shows the welcome sheet on the first launch, then the access guide.
+    /// Someone who has already seen the guide is past their first launch.
     func showOnFirstLaunchIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard UserHome.demoPath == nil, !defaults.bool(forKey: Self.welcomeShownKey),
+              !defaults.bool(forKey: Self.shownKey) else {
+            showGuideIfNeeded()
+            return
+        }
+        defaults.set(true, forKey: Self.welcomeShownKey)
+        showWelcome = true
+    }
+
+    /// Shows the guide once, on the first launch without access.
+    func showGuideIfNeeded() {
         refresh()
         guard status == .denied, !UserDefaults.standard.bool(forKey: Self.shownKey) else { return }
         UserDefaults.standard.set(true, forKey: Self.shownKey)

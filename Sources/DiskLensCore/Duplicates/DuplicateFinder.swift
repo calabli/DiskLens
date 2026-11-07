@@ -148,6 +148,10 @@ public final class DuplicateFinder: @unchecked Sendable {
     /// (node_modules, .venv…) and hidden folders (.git, .npm…) belong to tools:
     /// identical copies there are expected, and deleting one breaks its owner.
     private func isEligible(_ node: Int, in tree: FileTree) -> Bool {
+        Self.isEligible(node, in: tree, homePath: homePath, includeLibrary: includeLibrary)
+    }
+
+    static func isEligible(_ node: Int, in tree: FileTree, homePath: String, includeLibrary: Bool) -> Bool {
         var i = Int(tree.parents[node])
         while i > 0 {
             let name = tree.names[i]

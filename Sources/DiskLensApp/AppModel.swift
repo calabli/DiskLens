@@ -105,6 +105,7 @@ final class AppModel {
         case changes
         case timeline
         case duplicates
+        case similarPhotos
         case storage
         case apps
         case history
@@ -228,6 +229,7 @@ final class AppModel {
         lastUsed = [:]
         comparison = nil
         duplicateGroups = nil
+        similarPhotoGroups = nil
         baseScan = nil
         showingSavedScanFrom = nil
         isUpdating = false
@@ -688,6 +690,54 @@ final class AppModel {
         duplicateFinder?.cancel()
         duplicateFinder = nil
         isFindingDuplicates = false
+    }
+
+    // MARK: Similar photos
+
+    private(set) var similarPhotoGroups: [SimilarPhotoGroup]?
+    private(set) var similarPhotoProgress: SimilarPhotoProgress?
+    private(set) var isFindingSimilarPhotos = false
+    /// The tree generation the groups' node ids belong to.
+    private(set) var similarPhotosGeneration = -1
+    @ObservationIgnored private var similarPhotoFinder: SimilarPhotoFinder?
+    @ObservationIgnored private let photoPrints = PhotoPrintCache()
+
+    var similarPhotosAreStale: Bool { similarPhotoGroups != nil && similarPhotosGeneration != treeGeneration }
+
+    func findSimilarPhotos(similarity: PhotoSimilarity) {
+        guard let tree, !isBusy else { return }
+        similarPhotoFinder?.cancel()
+        let finder = SimilarPhotoFinder(cache: photoPrints)
+        finder.similarity = similarity
+        similarPhotoFinder = finder
+        isFindingSimilarPhotos = true
+        similarPhotoProgress = nil
+        let generation = treeGeneration
+        Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                Result {
+                    try finder.find(in: tree) { progress in
+                        Task { @MainActor in
+                            guard self.similarPhotoFinder === finder else { return }
+                            self.similarPhotoProgress = progress
+                        }
+                    }
+                }
+            }.value
+            guard similarPhotoFinder === finder else { return }
+            isFindingSimilarPhotos = false
+            similarPhotoFinder = nil
+            if case let .success(groups) = result {
+                similarPhotoGroups = groups
+                similarPhotosGeneration = generation
+            }
+        }
+    }
+
+    func cancelFindingSimilarPhotos() {
+        similarPhotoFinder?.cancel()
+        similarPhotoFinder = nil
+        isFindingSimilarPhotos = false
     }
 
     // MARK: Basket
