@@ -8,10 +8,10 @@ The package has three products: the scan engine (`DiskLensCore`), the SwiftUI ap
 
 ```bash
 ./scripts/build-app.sh
-open build/DiskLens.app
+open build/app.noindex/DiskLens.app
 ```
 
-`open build/DiskLens.app --args --scan ~/Downloads` starts scanning a folder right away.
+`open build/app.noindex/DiskLens.app --args --scan ~/Downloads` starts scanning a folder right away.
 
 The bundle is ad-hoc signed. macOS ties Full Disk Access to that signature, so after a rebuild the permission may need to be granted again.
 

@@ -28,7 +28,7 @@ scripts/build-app.sh
 mkdir -p build/release
 ZIP="build/release/DiskLens-$VERSION.zip"
 rm -f "build/release/DiskLens-$VERSION.zip" "build/release/DiskLens-$VERSION.zip.sig"
-ditto -c -k --keepParent build/DiskLens.app "$ZIP"
+ditto -c -k --keepParent build/app.noindex/DiskLens.app "$ZIP"
 swift build -c release --product disklens >/dev/null
 .build/release/disklens sign "$KEY" "$ZIP"
 SHA="$(shasum -a 256 "$ZIP" | cut -d' ' -f1)"

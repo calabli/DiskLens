@@ -1,5 +1,6 @@
 #!/bin/bash
-# Builds DiskLens.app into build/ from the SwiftPM DiskLensApp product.
+# Builds DiskLens.app into build/app.noindex/ from the SwiftPM DiskLensApp product. Spotlight
+# skips .noindex folders, so this copy stays out of app search next to the installed one.
 # The bundle is ad-hoc signed, which is enough to run it locally; distribution
 # needs a Developer ID signature and notarization.
 set -euo pipefail
@@ -13,7 +14,7 @@ swift build -c release "${ARCH_FLAGS[@]}" --product DiskLensApp
 swift build -c release "${ARCH_FLAGS[@]}" --product DiskLensAgent
 BIN_DIR="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)"
 
-APP=build/DiskLens.app
+APP=build/app.noindex/DiskLens.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/DiskLensApp" "$APP/Contents/MacOS/DiskLens"
