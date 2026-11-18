@@ -138,6 +138,41 @@ private func sizesByPath(_ tree: FileTree) -> [String: Int64] {
     #expect(ChangeJournal.journalID(for: folder.root) != nil)
 }
 
+/// A whole-disk scan starts at /System/Volumes/Data, but FSEvents names those files from /.
+@Test func theJournalReportsChangesUnderTheDataVolume() async throws {
+    let folder = try Folder()
+    try folder.populate()
+    // realpath: Foundation spells it /var, the data volume only has /private/var.
+    let real = try #require(realpath(folder.root, nil))
+    defer { free(real) }
+    let root = "/System/Volumes/Data" + String(cString: real)
+    try #require(FileManager.default.fileExists(atPath: root))
+    let since = ChangeJournal.currentEventID()
+    try folder.change()
+
+    var changes: ChangeSet?
+    for _ in 0..<30 {
+        changes = ChangeJournal.changes(under: root, since: since)
+        if let changes, changes.folders.contains(root + "/a/b") { break }
+        try await Task.sleep(for: .milliseconds(200))
+    }
+    let found = try #require(changes)
+    #expect(found.folders.contains(root + "/a/b"))
+    #expect(found.folders.allSatisfy { $0.hasPrefix(root + "/") || $0 == root })
+}
+
+@Test func dataVolumeEventPathsAreSpelledFromTheScanRoot() {
+    let data = "/System/Volumes/Data"
+    #expect(ChangeJournal.treePath(ofEvent: "/Users/me/a/", realRoot: data, root: data) == data + "/Users/me/a")
+    #expect(ChangeJournal.treePath(ofEvent: data + "/.Spotlight-V100/", realRoot: data, root: data) == data + "/.Spotlight-V100")
+    #expect(ChangeJournal.treePath(ofEvent: "/", realRoot: data, root: data) == data)
+    #expect(ChangeJournal.treePath(ofEvent: "/Users/me/a", realRoot: data + "/Users/me", root: data + "/Users/me") == data + "/Users/me/a")
+    #expect(ChangeJournal.treePath(ofEvent: "/Users/other", realRoot: data + "/Users/me", root: data + "/Users/me") == nil)
+    // Other roots are unchanged.
+    #expect(ChangeJournal.treePath(ofEvent: "/Users/me/a/", realRoot: "/Users/me", root: "/Users/me") == "/Users/me/a")
+    #expect(ChangeJournal.treePath(ofEvent: "/Users/other", realRoot: "/Users/me", root: "/Users/me") == nil)
+}
+
 @Test func comparisonPointsAtTheMostSpecificChanges() throws {
     let folder = try Folder()
     try folder.populate()

@@ -73,18 +73,37 @@ public enum ChangeJournal {
         guard replayed, !collector.mustRescanAll else { return nil }
         var changes = ChangeSet()
         func spelled(_ path: String) -> String? {
-            let trimmed = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
-            if trimmed == realRoot { return root }
-            guard trimmed.hasPrefix(realRoot == "/" ? "/" : realRoot + "/") else { return nil }
-            return root + trimmed.dropFirst(realRoot == "/" ? 0 : realRoot.count)
+            treePath(ofEvent: path, realRoot: realRoot, root: root)
         }
         for path in collector.folders { if let p = spelled(path) { changes.folders.insert(p) } }
         for path in collector.subtrees {
             // Detail lost above the root means the root needs a full rescan.
+            let path = onDataVolume(path, realRoot: realRoot)
             if realRoot.hasPrefix(path.hasSuffix("/") ? path : path + "/") || path == realRoot { return nil }
             if let p = spelled(path) { changes.subtrees.insert(p) }
         }
         return changes
+    }
+
+    private static let dataVolume = "/System/Volumes/Data"
+
+    /// FSEvents names a file on the data volume by its path from / (/Users/…), even
+    /// when the stream watches the data volume itself. A root on the data volume
+    /// spells it /System/Volumes/Data/Users/…, so add the prefix back.
+    static func onDataVolume(_ eventPath: String, realRoot: String) -> String {
+        guard realRoot == dataVolume || realRoot.hasPrefix(dataVolume + "/"),
+              eventPath != dataVolume, !eventPath.hasPrefix(dataVolume + "/") else { return eventPath }
+        return eventPath == "/" ? dataVolume : dataVolume + eventPath
+    }
+
+    /// The path in the scanned tree that an event path refers to, spelled from `root`,
+    /// or nil when the event is outside it.
+    static func treePath(ofEvent eventPath: String, realRoot: String, root: String) -> String? {
+        let path = onDataVolume(eventPath, realRoot: realRoot)
+        let trimmed = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        if trimmed == realRoot { return root }
+        guard trimmed.hasPrefix(realRoot == "/" ? "/" : realRoot + "/") else { return nil }
+        return root + trimmed.dropFirst(realRoot == "/" ? 0 : realRoot.count)
     }
 
     private static func realPath(_ path: String) -> String? {
